@@ -130,7 +130,8 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const pad=n=>String(n).padStart(2,'0');
 const fmt=t=>{t=Math.max(0,t|0);const h=t/3600|0,m=(t%3600)/60|0,s=t%60;return(h?h+':'+pad(m):m)+':'+pad(s)};
 const fmtDate=d=>{const m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(d||'');return m?new Date(+m[1],m[2]-1,+m[3]).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):(d||'')};
-const PREF=['Serve','Receive','Set','Hit','Block'];
+// Play filter order: the team's labels from team.json, or the defaults
+let PREF=['Serve','Receive','Set','Hit','Block'];
 // Filter value for clips with no one tagged
 const NOBODY='Unassigned';
 const hasP=(c,p)=>p===NOBODY?!c.players.length:c.players.includes(p);
@@ -182,6 +183,10 @@ function afterLoad(){
   render();
 }
 async function loadIndex(){
+  try{
+    const t=await (await fetch('../team/team.json',{cache:'no-cache'})).json();
+    if(Array.isArray(t.labels)){const l=t.labels.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim());if(l.length)PREF=l}
+  }catch(e){}
   try{
     const r=await fetch('../team/clips/index.json',{cache:'no-cache'});if(!r.ok)throw 0;
     for(const n of await r.json()){

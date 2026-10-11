@@ -86,9 +86,11 @@ await check('hub team', '/team/', async p => {
   expect((await p.innerText('#sub')).includes('Sample Squad'), 'team name should show');
 });
 await check('clips team', '/team/clips/', async p => {
-  expect((await p.innerText('#sub')).includes('5 clips'), 'should load the 5 fixture clips');
+  expect((await p.innerText('#sub')).includes('6 clips'), 'should load the 6 fixture clips');
+  const plays = await p.$$eval('#filters .chip[data-k="actions"]', b => b.map(x => x.dataset.v).filter(Boolean));
+  expect(plays.join() === 'Serve,Receive,Dig,Hit,Block', `play filters should follow the team's label order (only plays that have clips), got ${plays}`);
   await p.click('#filters .chip[data-v="Unassigned"]');
-  expect((await p.innerText('#results')).startsWith('1 of 5'), 'Unassigned should show the one untagged clip');
+  expect((await p.innerText('#results')).startsWith('1 of 6'), 'Unassigned should show the one untagged clip');
 });
 await check('clips demo', '/demo/clips/', async p => {
   expect(await p.isVisible('.empty'), 'should show the empty state');
@@ -117,14 +119,22 @@ await check('rotations team after demo edit', '/team/rotations/', async p => {
 });
 await check('marker team', '/team/clips/marker/', async p => {
   expect((await p.inputValue('#roster')) === 'Alex\nBlair\nCasey\nDrew\nEmery\nFinley', 'roster should come from team.json');
+  const acts = await p.evaluate(() => ACTIONS.map(a => a.join('=')));
+  expect(acts.join() === 'n=Serve,j=Receive,h=Dig,k=Set,l=Hit,;=Block', `play labels and keys from team.json, got ${acts}`);
+  await p.click('#hkopen');
+  expect(await p.isVisible('#hkteam') && !(await p.isVisible('#hkunlock')), 'label list should be locked to Team Setup on a team site');
 });
 await check('marker demo', '/demo/clips/marker/', async p => {
   expect((await p.inputValue('#roster')).startsWith('Player 1'), 'demo roster should be generic');
+  expect(await p.evaluate(() => ACTIONS.map(a => a[1]).join()) === 'Serve,Receive,Set,Hit,Block', 'demo should use the default labels');
+  await p.click('#hkopen');
+  expect(await p.isVisible('#hkunlock'), 'demo can still edit its own label list');
 });
 
 await check('setup team', '/team/setup/', async p => {
   expect((await p.inputValue('#tname')) === 'Sample Squad', 'should start from the team file');
   expect((await p.inputValue('#roster')).split('\n').length === 6, 'roster should come from the team file');
+  expect((await p.inputValue('#labels')).split('\n').join() === 'Serve,Receive,Dig,Set,Hit,Block', 'labels should come from the team file');
 });
 await check('setup demo', '/demo/setup/', async p => {
   expect((await p.inputValue('#tname')) === '', 'demo should start empty');
@@ -135,7 +145,7 @@ await check('setup demo', '/demo/setup/', async p => {
   const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#dl')]);
   expect(dl.suggestedFilename() === 'team.json', 'file should be named team.json');
   const out = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
-  expect(out.name === 'New Team' && out.roster.join() === 'Ana,Bo,Cy', `unexpected team.json: ${JSON.stringify(out)}`);
+  expect(out.name === 'New Team' && out.roster.join() === 'Ana,Bo,Cy' && out.labels.join() === 'Serve,Receive,Set,Hit,Block', `unexpected team.json: ${JSON.stringify(out)}`);
 });
 
 // Starter files must stay valid

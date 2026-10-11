@@ -52,7 +52,7 @@ repository (**Add file → Upload files → Commit changes**). The site updates 
 
 | To change | Use | Upload |
 |---|---|---|
-| Team name or players | **Team Setup** | `team.json` |
+| Team name, players or play labels | **Team Setup** | `team.json` |
 | Rotation positions, highlights and notes | **5-1 Rotation Guide → Edit positions → Export JSON** | `rotations.json` |
 | Add a match | **Clip Marker → Download JSON** | the game file, into the `clips` folder |
 
@@ -70,7 +70,7 @@ This repo holds **code only**. Each team has its **own repo** with its data and 
 ```
 your-team-repo/
   .github/workflows/deploy.yml   from the team template (source: starter/deploy.yml)
-  team.json                      {"name": "...", "roster": ["...", "..."]}
+  team.json                      {"name": "...", "roster": [...], "labels": [...]} from Team Setup
   rotations.json                 exported from the rotation guide
   clips/*.json                   one file per game, exported from Clip Marker
 ```

@@ -1,11 +1,77 @@
 {
-  "game": {"id": "sample01", "name": "Sample Game", "date": "2026-01-10", "videoId": "M7lc1UVf-VE"},
-  "roster": ["Alex", "Blair", "Casey", "Drew", "Emery", "Finley"],
+  "game": {
+    "id": "sample01",
+    "name": "Sample Game",
+    "date": "2026-01-10",
+    "videoId": "M7lc1UVf-VE"
+  },
+  "roster": [
+    "Alex",
+    "Blair",
+    "Casey",
+    "Drew",
+    "Emery",
+    "Finley"
+  ],
   "clips": [
-    {"id": "c1", "start": 10, "end": 18, "players": ["Alex"], "action": "Serve", "note": ""},
-    {"id": "c2", "start": 30, "end": 38, "players": ["Blair"], "action": "Receive", "note": "Good platform"},
-    {"id": "c3", "start": 50, "end": 58, "players": [], "action": "Receive", "note": ""},
-    {"id": "c4", "start": 70, "end": 78, "players": ["Casey", "Drew"], "action": "Block", "note": ""},
-    {"id": "c5", "start": 90, "end": 98, "players": ["Emery"], "action": "Hit", "note": ""}
+    {
+      "id": "c1",
+      "start": 10,
+      "end": 18,
+      "players": [
+        "Alex"
+      ],
+      "action": "Serve",
+      "note": ""
+    },
+    {
+      "id": "c2",
+      "start": 30,
+      "end": 38,
+      "players": [
+        "Blair"
+      ],
+      "action": "Receive",
+      "note": "Good platform"
+    },
+    {
+      "id": "c3",
+      "start": 50,
+      "end": 58,
+      "players": [],
+      "action": "Receive",
+      "note": ""
+    },
+    {
+      "id": "c4",
+      "start": 70,
+      "end": 78,
+      "players": [
+        "Casey",
+        "Drew"
+      ],
+      "action": "Block",
+      "note": ""
+    },
+    {
+      "id": "c5",
+      "start": 90,
+      "end": 98,
+      "players": [
+        "Emery"
+      ],
+      "action": "Hit",
+      "note": ""
+    },
+    {
+      "id": "c6",
+      "start": 110,
+      "end": 118,
+      "players": [
+        "Finley"
+      ],
+      "action": "Dig",
+      "note": ""
+    }
   ]
 }

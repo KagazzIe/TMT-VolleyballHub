@@ -30,7 +30,7 @@ ol{margin:6px 0 0;padding-left:22px}ol li{margin:4px 0}
 <main>
   <a class="back" href="../">&larr; TMT: Volleyball Hub</a>
   <h1>Team setup</h1>
-  <p class="intro">Fill this in and download your <b>team.json</b> file. It sets your team's name on the hub and the player list in Clip Marker.</p>
+  <p class="intro">Fill this in and download your <b>team.json</b> file. It sets your team's name on the hub, and the players and play labels in Clip Marker.</p>
   <p id="loaded" hidden>Filled in from your team's current file.</p>
   <div class="card">
     <label for="tname">Team name</label>
@@ -39,6 +39,13 @@ ol{margin:6px 0 0;padding-left:22px}ol li{margin:4px 0}
     <label for="roster">Players</label>
     <textarea id="roster" placeholder="One name per line"></textarea>
     <div class="hint">One name per line, in the order you want them in Clip Marker. The first players get number keys 1, 2, 3 and so on.</div>
+    <label for="labels">Play labels</label>
+    <textarea id="labels" style="min-height:150px">Serve
+Receive
+Set
+Hit
+Block</textarea>
+    <div class="hint">The kinds of plays you tag in Clip Marker, one per line, in the order you want them listed. Add your own, like Dig or Free ball. Renaming a label later doesn't rename clips you already tagged.</div>
     <div class="row"><button id="dl" class="pri">Download team.json</button><button id="cp">Copy text</button></div>
     <p id="msg" role="status"></p>
   </div>
@@ -54,11 +61,13 @@ ol{margin:6px 0 0;padding-left:22px}ol li{margin:4px 0}
 </main>
 <script>
 const $=id=>document.getElementById(id);
-const names=()=>[...new Set($('roster').value.split('\n').map(s=>s.trim()).filter(Boolean))];
+const lines=id=>[...new Set($(id).value.split('\n').map(s=>s.trim()).filter(Boolean))];
 function build(){
   const name=$('tname').value.trim();
   if(!name){$('msg').className='';$('msg').textContent='Add your team name first.';$('tname').focus();return null}
-  return JSON.stringify({name,roster:names()},null,2)+'\n';
+  const labels=lines('labels');
+  if(!labels.length){$('msg').className='';$('msg').textContent='Add at least one play label.';$('labels').focus();return null}
+  return JSON.stringify({name,roster:lines('roster'),labels},null,2)+'\n';
 }
 function done(t){$('msg').className='ok';$('msg').textContent=t}
 $('dl').onclick=()=>{
@@ -74,6 +83,7 @@ fetch('../team/team.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(
   if(!t)return;
   if(typeof t.name==='string')$('tname').value=t.name;
   if(Array.isArray(t.roster))$('roster').value=t.roster.map(String).join('\n');
+  if(Array.isArray(t.labels)&&t.labels.length)$('labels').value=t.labels.map(String).join('\n');
   $('loaded').hidden=false;
 });
 </script>

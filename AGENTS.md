@@ -32,7 +32,7 @@ Pure viewer preferences (playback speed, video size) may stay unscoped.
 | `/rotations/` | `rotations/index.html` | 5-1 rotation guide and its editor (exports `rotations.json`). |
 | `/clips/` | `clips/index.html` | Match clip viewer. |
 | `/clips/marker/` | `clips/marker/index.html` | Clip Marker, exports one game JSON. |
-| `/setup/` | `setup/index.html` | Team Setup, a form that downloads `team.json`. |
+| `/setup/` | `setup/index.html` | Team Setup, a form that downloads `team.json` (`name`, `roster`, `labels`). Team `labels` set Clip Marker's play list and the viewer's filter order; without them the defaults are Serve, Receive, Set, Hit, Block. |
 
 Each page is one self-contained HTML file with inline CSS and JS, plus the shared stylesheet.
 

@@ -13,7 +13,7 @@ Everything in this repository is public. Anyone with the link can see the site.
 
 | File | What it is | Where it comes from |
 |---|---|---|
-| `team.json` | Team name and player list | The hub's **Team Setup** page |
+| `team.json` | Team name, player list and play labels (Serve, Receive, your own…) | The hub's **Team Setup** page |
 | `rotations.json` | Your rotation positions, highlights and notes | The hub's **5-1 Rotation Guide** → Edit positions → Export JSON |
 | `clips/` | One file per match | The hub's **Clip Marker** → Download JSON |
 | `.github/workflows/deploy.yml` | Builds your site. You don't need to touch it. | Came with this repository |

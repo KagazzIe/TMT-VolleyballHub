@@ -115,6 +115,7 @@ textarea{width:100%;min-height:150px;margin-top:6px}
 <dialog id="hk" aria-label="Hotkeys">
   <div class="row" style="justify-content:space-between"><strong>Hotkeys and actions</strong><button id="hkx" class="pri">Done</button></div>
   <p class="mut" style="margin:6px 0 0">Click a key, then press the new key. Player keys follow each player's place in the roster.</p>
+  <p id="hkteam" class="mut" style="margin:6px 0 0" hidden>Play labels come from your team's <a href="../../setup/">Team Setup</a> page. You can change their keys here.</p>
   <p id="hkmsg" style="margin:6px 0 0;min-height:1.4em"></p>
   <div id="hkbody"></div>
   <div class="row" style="margin-top:12px"><button id="hkadd" hidden>Add action</button><button id="hkunlock">Edit action list</button><button id="hkreset">Reset to defaults</button></div>
@@ -312,6 +313,17 @@ function allBinds(){
 const usedBy=(k,cap)=>{const h=allBinds().find(b=>b.key===k&&!(b.t===cap.t&&b.id===cap.id));return h&&h.label};
 function setBinding(cap,k){if(cap.t==='cmd')S.cmdkeys[cap.id]=k;else if(cap.t==='player')S.pkeys[cap.id]=k;else ACTIONS[cap.id][0]=k}
 let capturing=null,unlocked=false;
+// Team play labels (team.json "labels"). When present they set the action list; keys stay per browser.
+let TEAM_LABELS=null;
+const KEY_POOL=['n','j','k','l',';','h','u','i','o','p','y','g','b','v','c','x','z'];
+function applyTeamLabels(labels){
+  TEAM_LABELS=labels;
+  const prev=new Map(ACTIONS.map(a=>[a[1],a[0]]));
+  const next=labels.map(l=>[prev.get(l)||'',l]);
+  const used=new Set([...CMDS.map(c=>ckey(c[0])),...S.roster.map((n,i)=>pkey(i)),...next.map(a=>a[0])].filter(Boolean));
+  next.forEach(a=>{if(!a[0]){const k=KEY_POOL.find(k=>!used.has(k));if(k){a[0]=k;used.add(k)}}});
+  S.actions=next;ACTIONS=S.actions;save();render();
+}
 const hkMsg=t=>{$('#hkmsg').textContent=t};
 const keyBtn=(t,id,key)=>{const on=capturing&&capturing.t===t&&capturing.id===id;
   return `<button class="keybtn ${on?'cap':''}" data-hk="${t}:${id}">${on?'Press a key (Esc cancels)':key?esc(pretty(key)):'Not set'}</button>`};
@@ -322,7 +334,7 @@ function renderHk(){
     '<h3>Actions</h3>'+ACTIONS.map((a,i)=>unlocked
       ?`<div class="hkrow"><input data-ai="${i}" value="${esc(a[1])}" aria-label="Action name">${keyBtn('act',i,a[0])}<button data-adel="${i}" aria-label="Delete action">✕</button></div>`
       :`<div class="hkrow"><span>${esc(a[1])}</span>${keyBtn('act',i,a[0])}</div>`).join('');
-  $('#hkadd').hidden=!unlocked;$('#hkunlock').hidden=unlocked;
+  $('#hkadd').hidden=!unlocked;$('#hkunlock').hidden=unlocked||!!TEAM_LABELS;$('#hkteam').hidden=!TEAM_LABELS;
 }
 $('#hkbody').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
@@ -345,6 +357,7 @@ $('#hkadd').onclick=()=>{ACTIONS.push(['','New action']);save();render();renderH
 $('#hkreset').onclick=()=>{
   if(!confirm('Reset all hotkeys and actions to their defaults?'))return;
   S.cmdkeys={};S.pkeys=[];S.actions=DEFAULT_ACTIONS.map(a=>[...a]);ACTIONS=S.actions;
+  if(TEAM_LABELS){S.actions=[];ACTIONS=S.actions;applyTeamLabels(TEAM_LABELS)}
   capturing=null;save();render();renderHk();
 };
 
@@ -424,7 +437,12 @@ $('#file').onchange=async e=>{
 };
 render();
 // Use the team roster from the team data folder until a roster is set here
-fetch('../../team/team.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(t=>{if(t&&Array.isArray(t.roster)&&t.roster.length&&S.roster.every((n,i)=>n==='Player '+(i+1))){S.roster=t.roster.map(String);save();$('#roster').value=S.roster.join('\n');render()}}).catch(()=>{});
+fetch('../../team/team.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(t=>{
+  if(!t)return;
+  if(Array.isArray(t.roster)&&t.roster.length&&S.roster.every((n,i)=>n==='Player '+(i+1))){S.roster=t.roster.map(String);save();$('#roster').value=S.roster.join('\n');render()}
+  const labels=Array.isArray(t.labels)?[...new Set(t.labels.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()))]:[];
+  if(labels.length)applyTeamLabels(labels);
+}).catch(()=>{});
 </script>
 </body>
 </html>

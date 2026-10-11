@@ -1,4 +1,19 @@
 {
   "name": "Sample Squad",
-  "roster": ["Alex", "Blair", "Casey", "Drew", "Emery", "Finley"]
+  "roster": [
+    "Alex",
+    "Blair",
+    "Casey",
+    "Drew",
+    "Emery",
+    "Finley"
+  ],
+  "labels": [
+    "Serve",
+    "Receive",
+    "Dig",
+    "Set",
+    "Hit",
+    "Block"
+  ]
 }
