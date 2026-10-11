@@ -74,7 +74,7 @@ jobs:
 
       - name: Check team data and build clip index
         run: |
-          rm -rf team/.git team/.github team/.gitignore starter AGENTS.md CLAUDE.md README.md
+          rm -rf team/.git team/.github team/.gitignore starter tests AGENTS.md CLAUDE.md README.md LICENSE
           mkdir -p team/clips
           python3 - <<'PY'
           import json, pathlib, sys

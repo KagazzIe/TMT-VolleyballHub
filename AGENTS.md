@@ -75,6 +75,8 @@ Components:
   like the rotation guide's editor.
 
 ## Before you finish
+- Run `node tests/smoke.mjs` (setup in the README). It must pass; extend it when you add a page or
+  behavior. Its sample team data is in `tests/fixtures/team` and must stay fictional.
 - Check each changed page in light and dark mode (`colorScheme: 'dark'` in Playwright) and at
   390px wide. No horizontal scrolling.
 - Check with and without a `team/` folder (copy a team repo's files into `team/`, it's gitignored),

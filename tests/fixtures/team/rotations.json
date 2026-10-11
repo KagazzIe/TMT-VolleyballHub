@@ -1,0 +1,9 @@
+{
+  "format": "tmt-rotations",
+  "version": 2,
+  "updated": 1767225600000,
+  "views": {
+    "bs|0|left": {"pos":{"S":[255,150],"OH1":[62,48],"MB1":[60,170],"OPP":[238,48],"OH2":[150,285],"MB2":[150,48]}},
+    "rx|0": {"pos":{"S":[260,100],"OH1":[180,40],"MB1":[230,225],"OPP":[70,225],"OH2":[150,225],"MB2":[150,70]},"libero":"OH2","highlights":[[1,2,"behind"]],"note":"Sample receive note."}
+  }
+}

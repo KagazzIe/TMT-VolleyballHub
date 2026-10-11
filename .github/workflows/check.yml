@@ -1,0 +1,30 @@
+name: Page checks
+
+# Loads every page with and without team data, in light and dark mode, at desktop and phone
+# width, and fails on errors, sideways scrolling or broken behavior. See tests/smoke.mjs.
+# The job name "Page checks" is the required status check in .github/rulesets/protect-main.json.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Page checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1.56.0
+          npx playwright install --with-deps chromium
+      - name: Run page checks
+        run: node tests/smoke.mjs

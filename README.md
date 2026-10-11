@@ -37,6 +37,10 @@ see its data. Nothing in the hub links to team sites.
 
 After that, each upload to the repo redeploys the site.
 
+**Trying the newest hub version:** your site runs the stable `v1` release. To preview the latest
+changes, go to **Actions → Deploy team hub → Run workflow** and pick **Hub version: main**.
+The next normal deploy switches back. To stay on `main`, add an Actions variable `HUB_VERSION` = `main`.
+
 ### Updating your data from the browser
 You can try all of this on the demo site first. Edits stay in your browser until you publish them.
 
@@ -58,7 +62,25 @@ This keeps the data off GitHub's repo pages, though the deployed site still serv
 3. Create a fine-grained token (Developer settings → Fine-grained tokens) for both repos with
    **Contents: Read and write**, and save it as the secret `TEAM_DATA_TOKEN` in both.
 
+## Contributing
+Changes go through pull requests into `main`. Every pull request runs **Page checks**
+(`.github/workflows/check.yml`), which loads each page with and without team data, in light and dark
+mode, at desktop and phone width, and fails on errors, sideways scrolling or broken behavior.
+Run the same checks locally:
+
+```
+npm install --no-save playwright@1.56.0
+npx playwright install chromium
+node tests/smoke.mjs
+```
+
+Design and data rules for new pages are in [`AGENTS.md`](AGENTS.md).
+
 ## Maintaining the hub (KagazzIe)
+- Repo rules live in `.github/rulesets/`: `main` needs a reviewed pull request with passing Page checks,
+  and only admins can create, move or delete `v*` tags. Import them under
+  **Settings → Rules → Rulesets → New ruleset → Import a ruleset**. Admins can bypass both.
+- To test a change on the team site before releasing it, run the team's deploy with **Hub version: main**.
 - This repo's own site is a demo with no team data. It uses the shared workflow from the current
   commit, so pushing to `main` shows exactly what `@main` teams will get.
 - The Team of Misfit Toys runs as a normal team from its own repo.
@@ -73,4 +95,8 @@ This keeps the data off GitHub's repo pages, though the deployed site still serv
 ## Testing locally
 Copy a team repo's data files into a `team/` folder here (it's gitignored), create
 `team/clips/index.json` listing the game files (e.g. `["2026-10-09-game-1.json"]`), then run
-`python -m http.server` and open http://localhost:8000/.
+`python -m http.server` and open http://localhost:8000/. Or copy `tests/fixtures/team` to `team/`
+for sample data.
+
+## License
+[MIT](LICENSE).
