@@ -29,7 +29,7 @@ main>*{min-width:0}
 #stage{position:sticky;top:14px;background:var(--bg)}
 .vid{position:relative;aspect-ratio:16/9;background:#000;border-radius:var(--r);overflow:hidden}
 .vid iframe{position:absolute;inset:0;width:100%;height:100%}
-/* With our own controls, YouTube's player is laid out at 1920x1080 and scaled down to fit, so its
+/* YouTube's player is laid out at 1920x1080 and scaled down to fit, so its
    automatic quality picks the highest available (up to 1080p). See AGENTS.md. */
 .vid.hq iframe{inset:auto;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;transform:scale(var(--yts,1))}
 #shield{position:absolute;inset:0;cursor:pointer}
@@ -45,7 +45,6 @@ main>*{min-width:0}
 .vol{display:flex;align-items:center;gap:6px}
 .vol input{width:96px}
 #mute{display:inline-flex;align-items:center;justify-content:center;padding:0;width:38px}
-.ytc{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:14px;white-space:nowrap}
 #q{width:100%;margin-bottom:4px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}
 .chip{border-radius:99px;padding:5px 12px;min-height:34px}
@@ -107,7 +106,7 @@ main>*{min-width:0}
 </header>
 <main>
   <section id="stage">
-    <div class="vid"><div id="player"></div><div id="shield"></div><div id="over"></div></div>
+    <div class="vid hq"><div id="player"></div><div id="shield"></div><div id="over"></div></div>
     <div class="bar">
       <button id="prev" aria-label="Previous clip">⏮</button>
       <button id="pp" aria-label="Play or pause">▶</button>
@@ -121,7 +120,6 @@ main>*{min-width:0}
       <button id="playall" class="pri">Play all</button>
       <label><input type="checkbox" id="auto"> Keep playing through the list</label>
       <span class="vol"><button id="mute" aria-label="Mute"></button><input type="range" id="vol" min="0" max="100" step="1" aria-label="Volume"></span>
-      <label class="ytc" title="Shows YouTube's own controls, including the gear menu for quality, captions and fullscreen"><input type="checkbox" id="ytc"> YouTube controls</label>
     </div>
   </section>
   <section id="side">
@@ -347,7 +345,7 @@ window.onYouTubeIframeAPIReady=()=>{apiReady=true;if(wantMake&&cur)make(cur)};
 const tag=document.createElement('script');tag.src='https://www.youtube.com/iframe_api';document.head.appendChild(tag);
 function make(c){
   loadedVid=c.vid;
-  yt=new YT.Player('player',{videoId:c.vid,width:ytControls?'100%':1920,height:ytControls?'100%':1080,playerVars:{controls:ytControls?1:0,disablekb:1,rel:0,modestbranding:1,playsinline:1,start:Math.floor(c.start)},
+  yt=new YT.Player('player',{videoId:c.vid,width:1920,height:1080,playerVars:{controls:0,disablekb:1,rel:0,modestbranding:1,playsinline:1,start:Math.floor(c.start)},
     events:{onReady:()=>{ready=true;applyVol();go()},onStateChange:e=>{syncPP();if(e.data===1)applyRate()}}});
 }
 function go(){
@@ -424,36 +422,25 @@ document.addEventListener('keydown',e=>{
   else if(e.key.toLowerCase()==='r'&&cur)play(cur);
 });
 
-/* ---------- volume and YouTube controls (remembered, shared with the other clip page) ---------- */
+/* ---------- volume (remembered, shared with the other clip page) ---------- */
 const pref=(k,d)=>{try{const v=localStorage.getItem(k);return v===null?d:v}catch(e){return d}};
 const setPref=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 let vol=+pref('tmt:volume','100');if(!(vol>=0&&vol<=100))vol=100;
-let muted=pref('tmt:muted','0')==='1',ytControls=pref('tmt:ytcontrols','0')==='1';
+let muted=pref('tmt:muted','0')==='1';
+try{localStorage.removeItem('tmt:ytcontrols')}catch(e){}  // setting from an earlier version
 const ICON_ON='<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',ICON_OFF='<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 function syncVol(){const off=muted||!vol;$('#vol').value=off?0:vol;$('#mute').innerHTML=off?ICON_OFF:ICON_ON;$('#mute').setAttribute('aria-label',off?'Unmute':'Mute')}
 function applyVol(){syncVol();if(!ready)return;yt.setVolume(vol);(muted||!vol)?yt.mute():yt.unMute()}
 $('#vol').oninput=e=>{vol=+e.target.value;muted=false;applyVol()};
 $('#vol').onchange=e=>{setPref('tmt:volume',vol);setPref('tmt:muted','0');e.target.blur()};
 $('#mute').onclick=()=>{muted=!(muted||!vol);if(!muted&&!vol)vol=50;setPref('tmt:muted',muted?'1':'0');setPref('tmt:volume',vol);applyVol()};
-// "YouTube controls" shows YouTube's own control bar (quality, captions, fullscreen). Websites can't
-// choose an embedded video's quality themselves, so this is how viewers pick it.
-const syncShield=()=>{$('#shield').hidden=ytControls;vidBox.classList.toggle('hq',!ytControls)};
 // Keep the full-HD player scaled to the box
 const vidBox=document.querySelector('.vid');
 const fitPlayer=()=>vidBox.style.setProperty('--yts',vidBox.clientWidth/1920);
 try{new ResizeObserver(fitPlayer).observe(vidBox)}catch(e){addEventListener('resize',fitPlayer)}
 fitPlayer();
 
-$('#ytc').checked=ytControls;syncShield();syncVol();
-$('#ytc').onchange=e=>{ytControls=e.target.checked;setPref('tmt:ytcontrols',ytControls?'1':'0');syncShield();remakePlayer();e.target.blur()};
-function remakePlayer(){
-  if(!yt)return;
-  // Rebuild the player with the new controls setting; the current clip starts again
-  try{yt.destroy()}catch(e){}
-  yt=null;ready=false;loadedVid=null;
-  if(!document.getElementById('player'))document.querySelector('.vid').insertAdjacentHTML('afterbegin','<div id="player"></div>');
-  if(cur)make(cur);
-}
+syncVol();
 let size=57;
 try{const v=+localStorage.getItem('clipviewer:size');if(v>=40&&v<=75)size=v}catch(e){}
 const applySize=()=>document.documentElement.style.setProperty('--pct',size+'%');

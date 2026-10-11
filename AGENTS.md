@@ -23,13 +23,14 @@ team's own repo and is copied to `team/` at deploy time by `.github/workflows/de
 A demo site and team sites can share one origin (`user.github.io/a/`, `user.github.io/b/`), and
 `localStorage` is per origin. Key anything site-specific (drafts, tool state) by the site's base path,
 for example `'name@' + new URL('../', location.href).pathname` from a page one folder deep.
-Pure viewer preferences (playback speed, video size) may stay unscoped. Volume and the
-"YouTube controls" switch are shared by the clip pages as `tmt:volume`, `tmt:muted` and `tmt:ytcontrols`.
+Pure viewer preferences (playback speed, video size) may stay unscoped. Volume is shared by the clip
+pages as `tmt:volume` and `tmt:muted`.
+
 YouTube no longer lets embeds set video quality (`setPlaybackQuality` does nothing); its automatic
-quality follows the player's layout size. So with our own controls the iframe is laid out at 1920x1080
-and scaled down with CSS (`.vid.hq`), which makes YouTube pick the highest quality up to 1080p
-(verified on a real 1080p video: 480p at normal size, 1080p this way). With YouTube controls on, the
-iframe is normal size so its bar stays usable, and its gear menu sets quality.
+quality follows the player's layout size. So the clip pages lay the iframe out at 1920x1080 and scale it
+down with CSS (`.vid.hq`), which makes YouTube pick the highest quality up to 1080p (verified on a real
+1080p video: 480p at normal size, 1080p this way). YouTube's own controls stay hidden (`controls: 0`);
+the pages provide play, seek, speed and volume.
 
 ## Pages
 | Path | File | Notes |

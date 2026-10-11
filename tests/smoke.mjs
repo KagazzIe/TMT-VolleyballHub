@@ -98,32 +98,23 @@ await check('clips team', '/team/clips/', async p => {
   await p.click('#filters .chip[data-v="Unassigned"]');
   expect((await p.innerText('#results')).startsWith('1 of 6'), 'Unassigned should show the one untagged clip');
 });
-await check('clips volume and YouTube controls', '/team/clips/', async p => {
+await check('clips volume and video quality', '/team/clips/', async p => {
   await p.click('#list .clip'); await p.waitForTimeout(150);
-  const yt = () => p.evaluate(() => { const q = __yt.players.filter(x => !x.destroyed).pop(); return { n: __yt.players.length, vol: q.vol, muted: q.muted, controls: q.opts.playerVars.controls }; });
+  const yt = () => p.evaluate(() => { const q = __yt.players.at(-1); return { vol: q.vol, muted: q.muted, controls: q.opts.playerVars.controls }; });
   let s = await yt();
-  expect(s.controls === 0 && s.vol === 100 && !s.muted, `player should start with our controls at full volume, got ${JSON.stringify(s)}`);
-  const frame = () => p.evaluate(() => { const f = document.querySelector('.vid iframe'), r = f.getBoundingClientRect(), box = document.querySelector('.vid').getBoundingClientRect(); return { w: f.offsetWidth, h: f.offsetHeight, shownW: Math.round(r.width), boxW: Math.round(box.width) }; });
-  let f = await frame();
+  expect(s.controls === 0 && s.vol === 100 && !s.muted, `player should start without YouTube's controls at full volume, got ${JSON.stringify(s)}`);
+  const f = await p.evaluate(() => { const fr = document.querySelector('.vid iframe'), r = fr.getBoundingClientRect(), box = document.querySelector('.vid').getBoundingClientRect(); return { w: fr.offsetWidth, h: fr.offsetHeight, shownW: Math.round(r.width), boxW: Math.round(box.width) }; });
   expect(f.w === 1920 && f.h === 1080 && Math.abs(f.shownW - f.boxW) <= 1, `player should be laid out at 1920x1080 and scaled to the box, got ${JSON.stringify(f)}`);
   await p.$eval('#vol', el => { el.value = 30; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change')); });
   s = await yt(); expect(s.vol === 30 && !s.muted, `volume slider should set 30, got ${JSON.stringify(s)}`);
   await p.click('#mute'); s = await yt(); expect(s.muted, 'mute button should mute');
   await p.click('#mute'); s = await yt(); expect(!s.muted && s.vol === 30, 'second click should unmute at the same volume');
-  await p.check('#ytc'); await p.waitForTimeout(150);
-  s = await yt(); expect(s.n === 2 && s.controls === 1 && s.vol === 30, `YouTube controls should rebuild the player with controls on, got ${JSON.stringify(s)}`);
-  expect(!(await p.isVisible('#shield')), 'click shield should be off so YouTube controls can be clicked');
-  f = await frame();
-  expect(f.w === f.boxW && f.shownW === f.boxW, `with YouTube controls the player should be normal size, got ${JSON.stringify(f)}`);
 });
-await check('marker shares volume and controls settings', '/team/clips/marker/', async p => {
-  expect(await p.isChecked('#ytc') && (await p.inputValue('#vol')) === '30', 'settings from the clips page should carry over');
+await check('marker shares volume and uses the full-HD player', '/team/clips/marker/', async p => {
+  expect((await p.inputValue('#vol')) === '30', 'volume from the clips page should carry over');
   await p.fill('#url', 'https://www.youtube.com/watch?v=M7lc1UVf-VE'); await p.click('#load'); await p.waitForTimeout(150);
-  await p.evaluate(() => __yt.players[0].seekTo(125));
-  await p.uncheck('#ytc'); await p.waitForTimeout(150);
-  const s = await p.evaluate(() => { const q = __yt.players.filter(x => !x.destroyed).pop(); return { controls: q.opts.playerVars.controls, start: q.opts.playerVars.start, vol: q.vol }; });
-  expect(s.controls === 0 && s.start === 125 && s.vol === 30, `turning YouTube controls off should rebuild at the same spot, got ${JSON.stringify(s)}`);
-  expect(await p.isVisible('#shield'), 'click shield should be back');
+  const s = await p.evaluate(() => { const q = __yt.players.at(-1), fr = document.querySelector('.vid iframe'); return { controls: q.opts.playerVars.controls, vol: q.vol, w: fr.offsetWidth }; });
+  expect(s.controls === 0 && s.vol === 30 && s.w === 1920, `marker player should be full-HD layout at the saved volume, got ${JSON.stringify(s)}`);
 });
 await check('clips demo', '/demo/clips/', async p => {
   expect(await p.isVisible('.empty'), 'should show the empty state');
