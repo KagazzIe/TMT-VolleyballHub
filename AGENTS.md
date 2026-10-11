@@ -23,7 +23,9 @@ team's own repo and is copied to `team/` at deploy time by `.github/workflows/de
 A demo site and team sites can share one origin (`user.github.io/a/`, `user.github.io/b/`), and
 `localStorage` is per origin. Key anything site-specific (drafts, tool state) by the site's base path,
 for example `'name@' + new URL('../', location.href).pathname` from a page one folder deep.
-Pure viewer preferences (playback speed, video size) may stay unscoped.
+Pure viewer preferences (playback speed, video size) may stay unscoped. Volume and the
+"YouTube controls" switch are shared by the clip pages as `tmt:volume`, `tmt:muted` and `tmt:ytcontrols`.
+YouTube no longer lets embeds set video quality; the YouTube controls switch exposes its own quality menu.
 
 ## Pages
 | Path | File | Notes |

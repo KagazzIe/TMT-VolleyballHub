@@ -47,7 +47,13 @@ async function open(ctx, url, where) {
     if (m.type() === 'error' && !/Failed to load resource|net::ERR_/.test(m.text())) fail(where, `console error: ${m.text()}`);
   });
   // Keep the run offline and repeatable: only the local server is reachable.
-  await page.route('**/*', r => r.request().url().startsWith(BASE) ? r.continue() : r.abort());
+  const ytStub = fs.readFileSync(path.join(FIXTURE, '..', 'yt-stub.js'), 'utf8');
+  await page.route('**/*', r => {
+    const u = r.request().url();
+    if (u.startsWith(BASE)) return r.continue();
+    if (u.startsWith('https://www.youtube.com/iframe_api')) return r.fulfill({ contentType: 'text/javascript', body: ytStub });
+    return r.abort();
+  });
   await page.goto(url);
   await page.waitForTimeout(800);
   return page;
@@ -91,6 +97,28 @@ await check('clips team', '/team/clips/', async p => {
   expect(plays.join() === 'Serve,Receive,Dig,Hit,Block', `play filters should follow the team's label order (only plays that have clips), got ${plays}`);
   await p.click('#filters .chip[data-v="Unassigned"]');
   expect((await p.innerText('#results')).startsWith('1 of 6'), 'Unassigned should show the one untagged clip');
+});
+await check('clips volume and YouTube controls', '/team/clips/', async p => {
+  await p.click('#list .clip'); await p.waitForTimeout(150);
+  const yt = () => p.evaluate(() => { const q = __yt.players.filter(x => !x.destroyed).pop(); return { n: __yt.players.length, vol: q.vol, muted: q.muted, controls: q.opts.playerVars.controls }; });
+  let s = await yt();
+  expect(s.controls === 0 && s.vol === 100 && !s.muted, `player should start with our controls at full volume, got ${JSON.stringify(s)}`);
+  await p.$eval('#vol', el => { el.value = 30; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change')); });
+  s = await yt(); expect(s.vol === 30 && !s.muted, `volume slider should set 30, got ${JSON.stringify(s)}`);
+  await p.click('#mute'); s = await yt(); expect(s.muted, 'mute button should mute');
+  await p.click('#mute'); s = await yt(); expect(!s.muted && s.vol === 30, 'second click should unmute at the same volume');
+  await p.check('#ytc'); await p.waitForTimeout(150);
+  s = await yt(); expect(s.n === 2 && s.controls === 1 && s.vol === 30, `YouTube controls should rebuild the player with controls on, got ${JSON.stringify(s)}`);
+  expect(!(await p.isVisible('#shield')), 'click shield should be off so YouTube controls can be clicked');
+});
+await check('marker shares volume and controls settings', '/team/clips/marker/', async p => {
+  expect(await p.isChecked('#ytc') && (await p.inputValue('#vol')) === '30', 'settings from the clips page should carry over');
+  await p.fill('#url', 'https://www.youtube.com/watch?v=M7lc1UVf-VE'); await p.click('#load'); await p.waitForTimeout(150);
+  await p.evaluate(() => __yt.players[0].seekTo(125));
+  await p.uncheck('#ytc'); await p.waitForTimeout(150);
+  const s = await p.evaluate(() => { const q = __yt.players.filter(x => !x.destroyed).pop(); return { controls: q.opts.playerVars.controls, start: q.opts.playerVars.start, vol: q.vol }; });
+  expect(s.controls === 0 && s.start === 125 && s.vol === 30, `turning YouTube controls off should rebuild at the same spot, got ${JSON.stringify(s)}`);
+  expect(await p.isVisible('#shield'), 'click shield should be back');
 });
 await check('clips demo', '/demo/clips/', async p => {
   expect(await p.isVisible('.empty'), 'should show the empty state');
