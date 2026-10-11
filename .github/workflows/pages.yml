@@ -1,0 +1,93 @@
+name: Deploy site
+
+# Code lives in this public repo. Team data (clips, rotations, roster) lives in a
+# private repo and is pulled into team/ only at deploy time, so it never enters
+# this repo's history. Note: once deployed, the site serves those files publicly.
+#
+# Setup: create a fine-grained token with Contents read/write on this repo and the
+# data repo, and save it as the secret TEAM_DATA_TOKEN in both. The data repo
+# defaults to "<this repo>-data"; set the variable TEAM_DATA_REPO to override.
+# Without the secret, the site deploys with no team data (useful for forks).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  repository_dispatch:
+    types: [team-data-updated]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      TEAM_DATA_REPO: ${{ vars.TEAM_DATA_REPO || format('{0}-data', github.repository) }}
+      HAS_TEAM_TOKEN: ${{ secrets.TEAM_DATA_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch team data
+        if: env.HAS_TEAM_TOKEN == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TEAM_DATA_REPO }}
+          token: ${{ secrets.TEAM_DATA_TOKEN }}
+          path: team
+
+      - name: Check team data and build clip index
+        run: |
+          rm -rf team/.git team/.github
+          mkdir -p team/clips
+          python3 - <<'PY'
+          import json, pathlib, sys
+          team = pathlib.Path("team")
+          clips = team / "clips"
+          files = sorted(p.name for p in clips.glob("*.json") if p.name != "index.json")
+          bad = []
+          for name in files:
+              try:
+                  d = json.loads((clips / name).read_text(encoding="utf-8"))
+                  assert isinstance(d.get("clips"), list), "no clips list"
+              except Exception as e:
+                  bad.append(f"clips/{name}: {e!r}")
+          rot = team / "rotations.json"
+          if rot.exists():
+              try:
+                  d = json.loads(rot.read_text(encoding="utf-8"))
+                  assert d.get("format") == "tmt-rotations", "format is not tmt-rotations"
+                  assert isinstance(d.get("views"), dict), "no views object"
+              except Exception as e:
+                  bad.append(f"rotations.json: {e!r}")
+          info = team / "team.json"
+          if info.exists():
+              try:
+                  json.loads(info.read_text(encoding="utf-8"))
+              except Exception as e:
+                  bad.append(f"team.json: {e!r}")
+          if bad:
+              print("These team data files are not valid:")
+              print("\n".join(bad))
+              sys.exit(1)
+          (clips / "index.json").write_text(json.dumps(files, indent=2))
+          print("Listed", len(files), "game file(s):", files)
+          PY
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

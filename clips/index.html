@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clips · TMT: Volleyball Hub</title>
+<style>
+:root{--bg:#eef1f5;--panel:#fff;--ink:#14202e;--mut:#66758a;--line:#d5dbe4;--acc:#1f5eff;--ok:#1b9e6b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+button,select,input{font:inherit;color:inherit;background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 11px}
+button{cursor:pointer}button:hover{border-color:var(--acc)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.pri{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:600}
+.mut{color:var(--mut)}.small{font-size:13px}
+[hidden]{display:none!important}
+header{display:flex;gap:4px 12px;align-items:baseline;flex-wrap:wrap;padding:12px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:17px;margin:0}
+header .sp{flex:1}
+header button{align-self:center}
+#warn{background:#fff3cd;padding:8px 14px;border-bottom:1px solid #e6d58f}
+main{display:grid;grid-template-columns:min(var(--pct,57%),calc(100% - 334px)) minmax(0,1fr);gap:14px;padding:14px;align-items:start}
+.sizectl{display:flex;align-items:center;gap:6px;color:var(--mut);align-self:center}
+.sizectl input{width:120px;padding:0}
+#stage{position:sticky;top:14px;background:var(--bg)}
+.vid{position:relative;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden}
+.vid iframe{position:absolute;inset:0;width:100%;height:100%}
+#shield{position:absolute;inset:0;cursor:pointer}
+#over{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(10,18,30,.72);color:#fff;text-align:center;padding:12px}
+#over .row{display:flex;gap:8px}
+#over button:not(.pri){color:var(--ink)}
+.bar{display:flex;gap:8px;align-items:center;padding:10px 0 4px}
+#seek{flex:1;padding:0;min-width:0}
+#time{font-variant-numeric:tabular-nums;color:var(--mut);min-width:84px;text-align:right}
+#now{min-height:44px;padding:2px 0 6px}
+.playrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.playrow label{color:var(--mut)}
+#q{width:100%;margin-bottom:4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}
+.chip{border-radius:99px;padding:4px 11px;font-size:14px}
+.chip b{font-weight:600;color:var(--mut);margin-left:4px}
+.chip .d{color:var(--mut);font-size:12px;margin-left:4px}
+.chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.chip.on b,.chip.on .d{color:#dbe5ff}
+.chip.zero{opacity:.45}
+.filters h2{font-size:13px;margin:12px 0 6px;color:var(--mut);font-weight:600}
+.seg{display:flex;gap:6px;align-items:center;color:var(--mut);font-size:14px;margin:0 0 6px}
+.seg button{padding:2px 10px;border-radius:99px;font-size:14px}
+.seg button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+#results{display:flex;justify-content:space-between;align-items:center;margin:14px 0 0;color:var(--mut)}
+#results button{padding:2px 10px}
+#list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.gh{margin:10px 0 0;font-size:14px;position:relative}
+.clip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;scroll-margin-top:var(--stageh,300px)}
+.clip:hover{border-color:var(--acc)}
+.clip.sel{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+.top{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.top .t{margin-left:auto;color:var(--mut);font-variant-numeric:tabular-nums}
+.tag{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:0 9px;font-size:13px}
+.note{margin-top:4px}
+.empty{background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:22px 16px;text-align:center;color:var(--mut)}
+.empty button{margin-top:10px}
+.gamesrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#gdd{position:relative}
+#gdd summary{list-style:none;cursor:pointer;background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 11px;user-select:none}
+#gdd summary::after{content:" ▾";color:var(--mut)}
+#gdd summary::-webkit-details-marker{display:none}
+#gpanel{position:absolute;z-index:6;top:calc(100% + 4px);left:0;min-width:290px;max-width:min(92vw,420px);max-height:min(60vh,360px);overflow:auto;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;box-shadow:0 8px 24px rgba(20,32,46,.15)}
+.gtools{display:flex;gap:8px;padding:2px 2px 8px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.gtools button{padding:3px 10px;font-size:14px}
+.grow{display:flex;gap:8px;align-items:center;padding:5px 4px;cursor:pointer}
+.grow .gn{flex:1}
+.grow b{color:var(--mut);font-weight:600;min-width:22px;text-align:right}
+.acts{margin-left:auto;display:flex;gap:10px;align-items:center;color:var(--mut)}
+.copy{padding:2px 10px;font-size:13px}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ok);color:#fff;padding:6px 16px;border-radius:99px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.on{opacity:1}
+@media(max-width:900px){
+  .sizectl{display:none}
+  main{grid-template-columns:1fr;padding:0;gap:0}
+  #stage{top:0;z-index:5;padding:0 12px 4px}
+  .vid{border-radius:0;margin:0 -12px}
+  #side{padding:8px 12px 28px}
+}
+</style>
+</head>
+<body>
+<div id="warn" hidden>YouTube blocks playback on pages opened straight from a file. Run <code>python3 -m http.server</code> in this folder and open <code>http://localhost:8000</code>, or host it on GitHub Pages.</div>
+<header>
+  <h1><a href="../" style="color:inherit;text-decoration:none" title="Hub home">TMT: Volleyball Hub</a></h1>
+  <span id="sub" class="mut"></span>
+  <span class="sp"></span>
+  <label class="sizectl">Video size <input type="range" id="size" min="40" max="75" step="1" aria-label="Video size"></label>
+  <button id="add">Add game JSON</button>
+  <button id="copy">Copy link to this filter</button>
+  <input type="file" id="file" accept=".json" multiple hidden>
+</header>
+<main>
+  <section id="stage">
+    <div class="vid"><div id="player"></div><div id="shield"></div><div id="over"></div></div>
+    <div class="bar">
+      <button id="prev" aria-label="Previous clip">⏮</button>
+      <button id="pp" aria-label="Play or pause">▶</button>
+      <button id="next" aria-label="Next clip">⏭</button>
+      <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Position within this clip">
+      <span id="time">0:00 / 0:00</span>
+      <select id="rate" aria-label="Playback speed" title="Playback speed ( [ and ] change it )"></select>
+    </div>
+    <div id="now"></div>
+    <div class="playrow">
+      <button id="playall" class="pri">Play all</button>
+      <label><input type="checkbox" id="auto"> Keep playing through the list</label>
+    </div>
+  </section>
+  <section id="side">
+    <input type="search" id="q" placeholder="Search notes, players or plays" aria-label="Search">
+    <div id="games" class="filters"></div>
+    <div id="filters" class="filters"></div>
+    <div id="results"></div>
+    <div id="list"></div>
+  </section>
+</main>
+<div id="toast"></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const fmt=t=>{t=Math.max(0,t|0);const h=t/3600|0,m=(t%3600)/60|0,s=t%60;return(h?h+':'+pad(m):m)+':'+pad(s)};
+const fmtDate=d=>{const m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(d||'');return m?new Date(+m[1],m[2]-1,+m[3]).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):(d||'')};
+const PREF=['Serve','Receive','Missed Receives','Set','Hit','Block'];
+const ALIAS={Spike:'Hit'};
+let GAMES={},GAME_ORDER=[],CLIPS=[],ROSTER=[];
+const Q=new URLSearchParams(location.search);
+const F={games:Q.getAll('game').length?new Set(Q.getAll('game')):null,players:new Set(Q.getAll('player')),actions:new Set(Q.getAll('action')),all:Q.get('all')==='1',q:Q.get('q')||'',order:Q.get('order')==='new'?'new':'old'};
+let cur=null,yt=null,ready=false,apiReady=false,wantMake=false,loadedVid=null,ended=false,armed=0,dragging=false;
+if(location.protocol==='file:')$('#warn').hidden=false;
+let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),1400)};
+
+/* ---------- data: one JSON file per game ---------- */
+function ingest(d){
+  if(!d||!Array.isArray(d.clips))return false;
+  const g=d.game||{},m=d.match||{};
+  const vid=g.videoId||m.videoId;if(!vid)return false;
+  const name=g.name||m.title||'Untitled game',date=g.date||m.date||'';
+  const gid=g.id||('legacy-'+vid+'-'+(date||name));
+  GAMES[gid]={id:gid,name,date,vid};
+  (d.roster||[]).forEach(n=>{if(!ROSTER.includes(n))ROSTER.push(n)});
+  CLIPS=CLIPS.filter(c=>c.gid!==gid);
+  d.clips.forEach(c=>{
+    const players=Array.isArray(c.players)?c.players:(c.player?[c.player]:[]);
+    let action=ALIAS[c.action]||c.action||'';
+    if(action==='Receive'&&!players.length)action='Missed Receives';
+    CLIPS.push({key:gid+':'+c.id,gid,id:c.id,vid,start:+c.start,end:+c.end,players,action,note:c.note||''});
+  });
+  return true;
+}
+function sortAll(){
+  const dir=F.order==='new'?-1:1,num=new Intl.Collator(undefined,{numeric:true});
+  GAME_ORDER=Object.keys(GAMES).sort((a,b)=>{
+    const da=GAMES[a].date,db=GAMES[b].date;
+    if(da!==db){if(!da)return 1;if(!db)return -1;return da<db?-dir:dir}
+    return dir*num.compare(GAMES[a].name,GAMES[b].name);
+  });
+  CLIPS.sort((a,b)=>GAME_ORDER.indexOf(a.gid)-GAME_ORDER.indexOf(b.gid)||a.start-b.start);
+}
+let firstLoad=true;
+function afterLoad(){
+  sortAll();
+  CLIPS.forEach(c=>c.players.forEach(n=>{if(!ROSTER.includes(n))ROSTER.push(n)}));
+  if(firstLoad&&CLIPS.length){
+    firstLoad=false;
+    if(F.games){F.games=new Set([...F.games].filter(g=>GAMES[g]));if(!F.games.size||F.games.size===GAME_ORDER.length)F.games=null}
+    const want=Q.get('clip'),c=want&&CLIPS.find(x=>x.key===want);
+    if(c){cur=c;setTimeout(markSel,60)}
+  }
+  render();
+}
+async function loadIndex(){
+  try{
+    const r=await fetch('../team/clips/index.json',{cache:'no-cache'});if(!r.ok)throw 0;
+    for(const n of await r.json()){
+      try{ingest(await (await fetch('../team/clips/'+(typeof n==='string'?n:n.file),{cache:'no-cache'})).json())}catch(e){}
+    }
+  }catch(e){}
+  afterLoad();
+}
+async function readFiles(files){
+  let ok=0;
+  for(const f of files){try{if(ingest(JSON.parse(await f.text())))ok++}catch(e){}}
+  ok?afterLoad():toast('That file is not a Clip Marker export');
+}
+$('#add').onclick=()=>$('#file').click();
+$('#file').onchange=e=>{readFiles([...e.target.files]);e.target.value=''};
+document.addEventListener('dragover',e=>e.preventDefault());
+document.addEventListener('drop',e=>{e.preventDefault();readFiles([...e.dataTransfer.files])});
+
+/* ---------- filtering: any of the picks within a group, all groups combined ---------- */
+const test={
+  games:c=>!F.games||F.games.has(c.gid),
+  players:c=>!F.players.size||(F.all?[...F.players].every(p=>c.players.includes(p)):[...F.players].some(p=>c.players.includes(p))),
+  actions:c=>!F.actions.size||F.actions.has(c.action),
+  q:c=>!F.q||(c.note+' '+c.action+' '+c.players.join(' ')).toLowerCase().includes(F.q.toLowerCase())
+};
+const filt=skip=>CLIPS.filter(c=>Object.keys(test).every(k=>k===skip||test[k](c)));
+const visible=()=>filt();
+const anyFilter=()=>F.games||F.players.size||F.actions.size||F.q;
+function chips(kind,allLabel,items,count,label){
+  const sel=F[kind];
+  return `<div class="chips"><button class="chip ${sel.size?'':'on'}" data-k="${kind}" data-v="">${allLabel}<b>${filt(kind).length}</b></button>`+
+    items.map(v=>{const n=count(v);return `<button class="chip ${sel.has(v)?'on':''} ${n?'':'zero'}" data-k="${kind}" data-v="${esc(v)}">${label(v)}<b>${n}</b></button>`}).join('')+'</div>';
+}
+let gamesOpen=false;
+const gameOn=g=>!F.games||F.games.has(g);
+function toggleGame(g){
+  const s=F.games?new Set(F.games):new Set(GAME_ORDER);
+  s.has(g)?s.delete(g):s.add(g);
+  F.games=s.size===GAME_ORDER.length?null:s;
+}
+function renderGames(){
+  const box=$('#games');
+  if(GAME_ORDER.length<2){box.innerHTML='';return}
+  const gf=filt('games'),sc=$('#gpanel')?$('#gpanel').scrollTop:0,n=F.games?F.games.size:GAME_ORDER.length;
+  box.innerHTML=`<h2>Games</h2><div class="gamesrow"><details id="gdd" ${gamesOpen?'open':''}><summary>${n===GAME_ORDER.length?'All games ('+n+')':n+' of '+GAME_ORDER.length+' games'}</summary><div id="gpanel">
+    <div class="gtools"><button data-g="all">Select all</button><button data-g="none">Select none</button></div>
+    ${GAME_ORDER.map(g=>`<label class="grow"><input type="checkbox" data-g="${esc(g)}" ${gameOn(g)?'checked':''}><span class="gn">${esc(GAMES[g].name)}</span><span class="mut small">${esc(fmtDate(GAMES[g].date))}</span><b>${gf.filter(c=>c.gid===g).length}</b></label>`).join('')}
+  </div></details>
+  <div class="seg">Order <button data-ord="old" class="${F.order==='old'?'on':''}">Oldest first</button><button data-ord="new" class="${F.order==='new'?'on':''}">Newest first</button></div></div>`;
+  if($('#gpanel'))$('#gpanel').scrollTop=sc;
+}
+$('#games').addEventListener('click',e=>{
+  const sm=e.target.closest('summary');if(sm){gamesOpen=!sm.parentNode.open;return}
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.g==='all')F.games=null;
+  else if(b.dataset.g==='none')F.games=new Set();
+  else if(b.dataset.ord){F.order=b.dataset.ord;sortAll()}
+  else return;
+  refresh();
+});
+$('#games').addEventListener('change',e=>{if(e.target.type==='checkbox'&&e.target.dataset.g){toggleGame(e.target.dataset.g);refresh()}});
+$('#games').addEventListener('toggle',e=>{gamesOpen=e.target.open},true);
+document.addEventListener('click',e=>{
+  if(gamesOpen&&!e.composedPath().some(n=>n.id==='gdd')){const d=$('#gdd');if(d)d.open=false;gamesOpen=false}
+});
+function renderFilters(){
+  renderGames();
+  if(!CLIPS.length){$('#filters').innerHTML='';return}
+  const acts=[...new Set(CLIPS.map(c=>c.action).filter(Boolean))].sort((a,b)=>{
+    const i=PREF.indexOf(a),j=PREF.indexOf(b);return(i<0?99:i)-(j<0?99:j)||a.localeCompare(b)});
+  const pf=filt('players'),af=filt('actions');
+  $('#filters').innerHTML=
+    '<h2>Player</h2>'+chips('players','Everyone',ROSTER,v=>pf.filter(c=>c.players.includes(v)).length,esc)+
+    (F.players.size>1?`<div class="seg">Clips with <button data-all="0" class="${F.all?'':'on'}">any of them</button><button data-all="1" class="${F.all?'on':''}">all of them</button></div>`:'')+
+    '<h2>Play</h2>'+chips('actions','All plays',acts,v=>af.filter(c=>c.action===v).length,esc);
+}
+function refresh(){renderFilters();renderList();setUrl()}
+$('#filters').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.all!==undefined){F.all=b.dataset.all==='1'}
+  else if(b.dataset.k){const s=F[b.dataset.k],v=b.dataset.v;v===''?s.clear():(s.has(v)?s.delete(v):s.add(v))}
+  refresh();
+});
+$('#q').value=F.q;
+$('#q').oninput=e=>{F.q=e.target.value.trim();refresh()};
+function clearAll(){F.games=null;F.players.clear();F.actions.clear();F.all=false;F.q='';$('#q').value='';refresh()}
+
+/* ---------- rendering ---------- */
+function renderHead(){
+  const n=CLIPS.length,one=GAME_ORDER.length===1?GAMES[GAME_ORDER[0]]:null;
+  $('#sub').textContent=!n?'':one?`${one.name}${one.date?', '+fmtDate(one.date):''}: ${n} clips`:`${n} clips across ${GAME_ORDER.length} games`;
+}
+const who=c=>c.players.length?' ('+esc(c.players.join(', '))+')':'';
+const card=c=>`<article class="clip ${cur&&cur.key===c.key?'sel':''}" data-key="${esc(c.key)}" tabindex="0">
+  <div class="top"><span><b>${esc(c.action||'Play')}</b>${who(c)}</span><span class="acts"><button class="copy" data-copy="${esc(c.key)}" title="Copy a YouTube link that starts at this moment">Copy link</button><span class="t">${fmt(c.start)}</span></span></div>
+  ${c.note?`<div class="note">${esc(c.note)}</div>`:''}</article>`;
+function renderList(){
+  const v=visible();
+  $('#playall').textContent='Play all'+(v.length?' ('+v.length+')':'');
+  $('#playall').disabled=!v.length;
+  $('#results').innerHTML=CLIPS.length?`<span>${v.length} of ${CLIPS.length} clips</span>${anyFilter()?'<button id="clrall">Clear filters</button>':''}`:'';
+  if(!CLIPS.length){
+    $('#list').innerHTML='<div class="empty">No clips loaded yet.<br>Add the game JSON files you exported from Clip Marker.<br><button id="add2" class="pri">Add game JSON</button><div class="small" style="margin-top:12px">To publish games for the team, upload each exported JSON to the <code>clips</code> folder of the team data repo.</div></div>';
+    return;
+  }
+  if(!v.length){$('#list').innerHTML='<div class="empty">No clips match these filters.</div>';return}
+  let html='',last=null;
+  v.forEach(c=>{
+    if(GAME_ORDER.length>1&&c.gid!==last){const g=GAMES[c.gid];html+=`<h3 class="gh">${esc(g.name)}${g.date?` <span class="mut">${esc(fmtDate(g.date))}</span>`:''}</h3>`;last=c.gid}
+    html+=card(c);
+  });
+  $('#list').innerHTML=html;
+}
+function renderNow(){
+  const g=cur&&GAME_ORDER.length>1?GAMES[cur.gid]:null;
+  $('#now').innerHTML=cur?`<div class="top"><span><b>${esc(cur.action||'Play')}</b>${who(cur)}</span>${g?`<span class="mut small">${esc(g.name)}</span>`:''}</div>${cur.note?`<div class="note">${esc(cur.note)}</div>`:''}`:'';
+}
+function render(){renderHead();renderFilters();renderList();renderNow();if(!ready&&!ended)showOver('idle')}
+function markSel(){document.querySelectorAll('.clip').forEach(x=>x.classList.toggle('sel',!!cur&&x.dataset.key===cur.key));document.querySelector('.clip.sel')?.scrollIntoView({block:'nearest',behavior:'smooth'})}
+document.addEventListener('click',e=>{
+  if(e.target.id==='add2')$('#file').click();
+  if(e.target.id==='clrall')clearAll();
+  if(e.target.matches('button'))e.target.blur();
+});
+$('#list').addEventListener('click',e=>{
+  const cp=e.target.closest('[data-copy]');
+  if(cp){copyText(clipUrl(cp.dataset.copy),'YouTube link copied');return}
+  const a=e.target.closest('.clip');if(a)play(CLIPS.find(c=>c.key===a.dataset.key));
+});
+new ResizeObserver(()=>document.documentElement.style.setProperty('--stageh',$('#stage').offsetHeight+'px')).observe($('#stage'));
+
+/* ---------- shareable links ---------- */
+function viewQuery(withClip){
+  const q=new URLSearchParams();
+  if(F.games)F.games.forEach(v=>q.append('game',v));F.players.forEach(v=>q.append('player',v));F.actions.forEach(v=>q.append('action',v));
+  if(F.all&&F.players.size>1)q.set('all','1');if(F.q)q.set('q',F.q);if(F.order==='new')q.set('order','new');
+  if(withClip&&cur)q.set('clip',cur.key);
+  return q.toString();
+}
+function setUrl(){try{const q=viewQuery(true);history.replaceState(null,'',q?'?'+q:location.pathname)}catch(e){}}
+async function copyText(text,msg){
+  try{await navigator.clipboard.writeText(text);toast(msg)}catch(e){prompt('Copy this link:',text)}
+}
+const clipUrl=key=>{const c=CLIPS.find(x=>x.key===key);return 'https://www.youtube.com/watch?v='+c.vid+'&t='+Math.floor(c.start)+'s'};
+$('#copy').onclick=()=>{const q=viewQuery(false);copyText(location.origin+location.pathname+(q?'?'+q:''),'Filter link copied')};
+
+/* ---------- player: every clip is cropped to its start and end ---------- */
+window.onYouTubeIframeAPIReady=()=>{apiReady=true;if(wantMake&&cur)make(cur)};
+const tag=document.createElement('script');tag.src='https://www.youtube.com/iframe_api';document.head.appendChild(tag);
+function make(c){
+  loadedVid=c.vid;
+  yt=new YT.Player('player',{videoId:c.vid,playerVars:{controls:0,disablekb:1,rel:0,modestbranding:1,playsinline:1,start:Math.floor(c.start)},
+    events:{onReady:()=>{ready=true;go()},onStateChange:e=>{syncPP();if(e.data===1)applyRate()}}});
+}
+function go(){
+  const c=cur;ended=false;armed=performance.now()+700;$('#over').hidden=true;
+  if(loadedVid===c.vid){yt.seekTo(c.start,true);yt.playVideo()}
+  else{yt.loadVideoById({videoId:c.vid,startSeconds:c.start});loadedVid=c.vid}
+  applyRate();
+}
+function play(c){
+  if(!c)return;
+  cur=c;ended=false;renderNow();markSel();setUrl();$('#over').hidden=true;
+  if(ready)go();else if(!yt){apiReady?make(c):wantMake=true}
+}
+function showOver(mode){
+  const o=$('#over');o.hidden=false;
+  if(mode==='ended')o.innerHTML='<div>Clip finished</div><div class="row"><button data-o="replay">Replay</button>'+(nextClip(1)?'<button class="pri" data-o="next">Next clip</button>':'')+'</div>';
+  else o.innerHTML=cur?'<div class="row"><button class="pri" data-o="replay">Play clip</button></div>':'<div>Pick a clip from the list to start.</div>';
+}
+$('#over').addEventListener('click',e=>{const o=e.target.dataset.o;if(o==='replay')play(cur);if(o==='next')step(1)});
+function nextClip(d){
+  const v=visible();let i=v.findIndex(c=>cur&&c.key===cur.key);
+  if(i<0)i=d>0?-1:v.length;
+  return v[i+d];
+}
+function step(d){const c=nextClip(d);if(c)play(c)}
+function toggle(){
+  if(!cur)return;
+  if(!ready||ended)return play(cur);
+  yt.getPlayerState()===1?yt.pauseVideo():yt.playVideo();
+}
+const RATES=[0.25,0.5,0.75,1,1.25,1.5,2];
+let rate=1;
+try{const v=+localStorage.getItem('clipviewer:rate');if(RATES.includes(v))rate=v}catch(e){}
+$('#rate').innerHTML=RATES.map(r=>`<option value="${r}">${r}x</option>`).join('');
+$('#rate').value=rate;
+function applyRate(){if(ready&&yt.getPlaybackRate()!==rate)yt.setPlaybackRate(rate)}
+function setRate(r){rate=r;$('#rate').value=r;applyRate();try{localStorage.setItem('clipviewer:rate',r)}catch(e){}}
+function stepRate(d){const i=Math.max(0,Math.min(RATES.length-1,RATES.indexOf(rate)+d));setRate(RATES[i]);toast(RATES[i]+'x speed')}
+$('#rate').onchange=e=>{setRate(+e.target.value);e.target.blur()};
+function syncPP(){$('#pp').textContent=ready&&yt.getPlayerState()===1?'❚❚':'▶'}
+$('#pp').onclick=toggle;$('#shield').onclick=toggle;
+$('#prev').onclick=()=>step(-1);$('#next').onclick=()=>step(1);
+$('#playall').onclick=()=>{const v=visible();if(v.length){$('#auto').checked=true;play(v[0])}};
+$('#seek').oninput=e=>{
+  if(!ready||!cur)return;
+  dragging=true;ended=false;$('#over').hidden=true;
+  yt.seekTo(cur.start+e.target.value/1000*(cur.end-cur.start),true);
+};
+$('#seek').onchange=e=>{dragging=false;armed=performance.now()+500;e.target.blur()};
+setInterval(()=>{
+  if(!ready||!cur)return;
+  const t=yt.getCurrentTime(),len=cur.end-cur.start;
+  if(!ended&&performance.now()>armed&&t>=cur.end-0.05){
+    yt.pauseVideo();ended=true;
+    const k=cur.key,n=nextClip(1);
+    if($('#auto').checked&&n)setTimeout(()=>{if(ended&&cur&&cur.key===k)play(n)},600);
+    else showOver('ended');
+  }
+  if(!dragging)$('#seek').value=Math.min(1,Math.max(0,(t-cur.start)/len))*1000;
+  $('#time').textContent=fmt(Math.min(len,Math.max(0,t-cur.start)))+' / '+fmt(len);
+  syncPP();
+},80);
+document.addEventListener('keydown',e=>{
+  const t=e.target;
+  if(t.matches('input[type=search],input[type=text],select,textarea')||e.metaKey||e.ctrlKey||e.altKey)return;
+  if(t.matches('button')&&(e.key===' '||e.key==='Enter'))return;
+  const card=t.classList&&t.classList.contains('clip')?t:null;
+  if(card&&(e.key==='Enter'||e.key===' ')){e.preventDefault();play(CLIPS.find(c=>c.key===card.dataset.key));return}
+  if(e.key===' '){e.preventDefault();toggle()}
+  else if(e.key==='ArrowRight'){e.preventDefault();step(1)}
+  else if(e.key==='ArrowLeft'){e.preventDefault();step(-1)}
+  else if(e.key==='[')stepRate(-1);
+  else if(e.key===']')stepRate(1);
+  else if(e.key.toLowerCase()==='r'&&cur)play(cur);
+});
+let size=57;
+try{const v=+localStorage.getItem('clipviewer:size');if(v>=40&&v<=75)size=v}catch(e){}
+const applySize=()=>document.documentElement.style.setProperty('--pct',size+'%');
+$('#size').value=size;applySize();
+$('#size').oninput=e=>{size=+e.target.value;applySize()};
+$('#size').onchange=e=>{try{localStorage.setItem('clipviewer:size',size)}catch(_){}e.target.blur()};
+render();loadIndex();
+</script>
+</body>
+</html>

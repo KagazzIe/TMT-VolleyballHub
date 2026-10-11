@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en" data-theme="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>5-1 Rotation Guide · TMT: Volleyball Hub</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;600&display=swap">
+<style data-guide>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#eef1f5;--ink:#14213d;--muted:#55607a;--card:#fff;--court:#e3b06a;--line:#fffdf6;--chip:#dde3ec;--on:#14213d;--onink:#fff;--S:#e63946;--OH:#1d6fdc;--MB:#2a9d5c;--OPP:#f4a300;--L:#7b5cd6}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1624;--ink:#e8edf6;--muted:#9aa6bf;--card:#18223a;--court:#8a5d26;--line:#f1e8d4;--chip:#26324f;--on:#e8edf6;--onink:#0f1624}}
+:root[data-theme="dark"]{--bg:#0f1624;--ink:#e8edf6;--muted:#9aa6bf;--card:#18223a;--court:#8a5d26;--line:#f1e8d4;--chip:#26324f;--on:#e8edf6;--onink:#0f1624}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.45 Barlow,system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px 14px 28px}
+h1{font:700 30px/1 "Barlow Condensed","Arial Narrow",sans-serif;margin:4px 0 14px;letter-spacing:.2px}
+.seg{display:flex;gap:6px;margin-bottom:10px}
+.seg button,.rot button{font:600 14px Barlow,system-ui,sans-serif;min-height:44px;border:0;border-radius:10px;background:var(--chip);color:var(--ink);cursor:pointer;flex:1;padding:0 8px}
+.seg button[aria-pressed="true"],.rot button[aria-pressed="true"]{background:var(--on);color:var(--onink)}
+button:focus-visible{outline:3px solid var(--OH);outline-offset:2px}
+.rot{display:grid;grid-template-columns:auto repeat(6,1fr);gap:6px;align-items:center;margin-bottom:12px}
+.rot span{font-weight:600;color:var(--muted);padding-right:4px}
+.rot button{font:700 18px "Barlow Condensed",sans-serif;padding:0}
+svg{display:block;width:100%;height:auto;border-radius:12px;background:var(--card)}
+.p{}
+@media(prefers-reduced-motion:reduce){.p{transition:none}}
+.card{background:var(--card);border-radius:12px;padding:12px 14px;margin-top:12px}
+.card p{margin:0 0 6px}.card p:last-child{margin:0}
+.muted{color:var(--muted);font-size:14px}
+.key{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;font-size:14px}
+.key i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+[hidden]{display:none!important}.seg+.seg{margin-top:-4px}
+svg.editing{touch-action:none}svg.editing .p{cursor:grab}textarea{width:100%;font:12px/1.3 ui-monospace,monospace;background:var(--card);color:var(--ink);border:1px solid var(--chip);border-radius:8px;padding:6px}#warn:empty{display:none}#warn{color:#d6402f;font-weight:600;margin-top:6px}
+.seg button:disabled{opacity:.5;cursor:default}
+#status{margin:0 0 10px}
+</style>
+</head>
+<body>
+<main>
+<a href="../" class="muted" style="text-decoration:none">&larr; TMT: Volleyball Hub</a>
+<h1>5-1 rotation guide</h1>
+<div class="seg" id="sys">
+  <button data-s="1" aria-pressed="true">5-1 positioning</button>
+  <button data-s="0" aria-pressed="false">Non-positional</button>
+</div>
+<div id="libWrap">
+  <div class="muted" style="font-weight:600;margin:2px 0 4px">Libero position</div>
+  <div class="seg" id="lib"><button data-l="left" aria-pressed="true">Left</button><button data-l="mid" aria-pressed="false">Middle</button><button data-l="off" aria-pressed="false">None</button></div>
+</div>
+<div class="rot" id="rot"><span>Rotation</span></div>
+<svg id="court" viewBox="0 0 300 372" role="img" aria-label="Half court showing player positions"></svg>
+<div class="seg" id="view" style="margin-top:10px"><button data-v="receive" aria-pressed="true">We're receiving</button><button data-v="serving" aria-pressed="false">We're serving</button><button data-v="base" aria-pressed="false">Base position</button></div>
+<p class="muted" id="status"></p>
+<div class="seg" id="editRow"><button id="editBtn" aria-pressed="false">Edit positions</button></div>
+<div class="card" id="editPanel" hidden>
+  <p class="muted" id="editMsg"></p>
+  <p class="muted" id="fileMsg"></p>
+  <div class="seg"><button id="resetView">Reset this view</button><button id="revert">Revert to team file</button></div>
+  <div class="seg"><button id="exportBtn">Export JSON</button><button id="importBtn">Load JSON</button></div>
+  <input type="file" id="importFile" accept=".json,application/json" hidden>
+  <p id="warn"></p>
+</div>
+<div class="card" id="exp" hidden><p class="muted">Upload this as <code>rotations.json</code> in the team data repo, replacing the old one. The site redeploys on its own. If the download is blocked, copy the text instead.</p><textarea id="expText" readonly rows="6"></textarea><div class="seg" style="margin-top:8px"><button id="expCopy">Copy</button><button id="expDl">Download rotations.json</button><button id="expClose">Close</button></div></div>
+<div class="card"><p id="head"></p><p class="muted" id="tip"></p></div>
+<div class="key">
+  <span><i style="background:var(--S)"></i>S setter</span>
+  <span><i style="background:var(--OH)"></i>OH outside</span>
+  <span><i style="background:var(--MB)"></i>MB middle</span>
+  <span><i style="background:var(--OPP)"></i>OPP opposite</span>
+  <span><i style="background:var(--L)"></i>L libero (never serves)</span>
+</div>
+<div class="card muted" id="serveNote"><p>Overlap rule: when the ball is served, each back-row player stays behind their front-row partner (1 behind 2, 6 behind 3, 5 behind 4), and neighbors stay in order left to right.</p></div>
+<div class="card muted" id="baseNote" hidden><p><b>Reading the hitter:</b> hold base until the ball is set, then move. Count the rhythm: pass, set, hit. If you haven't seen the ball by "3," expect a tip.</p><p>Position ideas adapted from Stork Hsu's 5-1 positional defense diagrams (2003). Shaded areas are dig zones and they overlap where defenders share a ball. The setter covers only a small piece of court.</p></div>
+</main>
+<script>
+// Team positions are loaded from the team data folder; nothing team-specific lives in this file.
+const TEAM_URL='../team/rotations.json',LS='tmt-rotations-draft-v2',LS_OLD='rotguide-edits-v1';
+const R=['S','OH1','MB1','OPP','OH2','MB2'];
+const START={S:1,OH1:2,MB2:3,OPP:4,OH2:5,MB1:6};
+const SX={4:70,3:150,2:230,5:70,6:150,1:230};
+const SUB=['MB1','MB1','OH1','MB2','MB2','OH2'];
+const front=s=>s===2||s===3||s===4;
+const nxt=s=>s===1?6:s-1;
+const kind=r=>r.replace(/\d/,'');
+const M=30,V=14;
+let pos=1,view='receive',rot=0,lib='left',edit=false,CUR={},tweenId=0,drag=null,confirmRevert=false;
+let TEAM={},TEAM_T=0,teamState='loading',EDITS={},draft=false;
+const slot=(r,n)=>{let s=START[r];for(let i=0;i<n;i++)s=nxt(s);return s};
+const isL=r=>pos===1&&lib!=='off'&&SUB[rot]===r;
+// Generic 5-1 serve-receive formations (defaults when the team file has no edit for a view)
+const RECV=[
+ {OPP:[68,224],MB2:[152,66],OH1:[178,36],OH2:[149,225],MB1:[231,224],S:[265,98]},
+ {OH2:[71,196],OPP:[197,72],MB2:[230,69],MB1:[153,223],S:[215,102],OH1:[250,222]},
+ {MB1:[35,72],S:[116,95],OH2:[73,214],OH1:[150,240],OPP:[238,72],MB2:[230,240]},
+ {S:[143,38],MB1:[150,72],OH2:[157,107],OH1:[70,240],MB2:[150,240],OPP:[230,240]},
+ {OH1:[42,56],S:[222,46],MB1:[245,75],MB2:[70,240],OPP:[150,240],OH2:[230,240]},
+ {MB2:[75,40],OPP:[70,240],OH1:[92,73],OH2:[150,240],MB1:[230,240],S:[238,72]}
+];
+const NOTES=[
+ 'OPP, OH2 and L pass in a line. MB2 and OH1 wait at the net, and the setter tucks in behind OH1.',
+ 'OH2, L and OH1 pass. OPP and MB2 wait at the net, and the setter hides behind OPP.',
+ 'OH2 (zone 5), L and MB2 pass. MB1 and OPP wait at the net, and the setter hides at the net, left of L.',
+ 'OH1, L and OPP pass in a line. The setter, MB1 and OH2 stack at the center of the net so they reach base quickly.',
+ 'L, OPP and OH2 pass in a line. OH1 waits at the net on the left, and the setter and MB1 wait at the net on the right.',
+ 'OPP, L and MB1 pass in a line. MB2 and OH1 wait at the net on the left, and the setter waits at the net on the right.'
+];
+// Generic base: front row at the net, wings short, middle back deep
+const BASE={LF:[62,48],MF:[150,48],RF:[238,48],LB:[60,170],MID:[150,285],RB:[240,170]};
+const ZR={LB:[100,100],MID:[125,85],RB:[100,100]};
+const ZSCALE=0.82,OVERLAP=0.06;   // zone size multiplier and how far neighboring zones may overlap (fraction of the gap)
+const FRONT=['LF','MF','RF'];
+const NUMS=[[4,70,112],[3,150,112],[2,230,112],[5,70,318],[6,150,318],[1,230,318]];
+// Key overlap rules to highlight in serve receive: [slot a, slot b, how a must sit relative to b]
+const HL=[
+ [[1,6,'right'],[1,2,'behind'],[4,3,'left']],
+ [[6,5,'right'],[6,1,'left'],[4,5,'front']],
+ [[3,6,'front'],[3,4,'right'],[5,6,'left'],[5,4,'behind']]
+];
+const PHRASE={right:'right of',left:'left of',behind:'behind',front:'in front of'};
+const nameAt=sl=>{const r=R.find(q=>slot(q,rot)===sl);return isL(r)?'L':r};
+const hlRules=()=>(pos===1&&view==='receive'&&HL[rot])?HL[rot]:[];
+const hlText=()=>hlRules().map(([a,b,t])=>`${nameAt(a)} ${PHRASE[t]} ${nameAt(b)}`);
+
+// Place each rule label as close to its line as possible without covering players, position numbers or other labels
+function segDist(px,py,A,B){
+  const dx=B[0]-A[0],dy=B[1]-A[1],L=dx*dx+dy*dy||1,u=Math.max(0,Math.min(1,((px-A[0])*dx+(py-A[1])*dy)/L));
+  return Math.hypot(px-(A[0]+u*dx),py-(A[1]+u*dy));
+}
+const ovl=(a,b)=>Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[1],b[1]));
+function placeLabels(items,P){
+  const obs=R.map(r=>[P[r][0]-17,P[r][1]-17,P[r][0]+17,P[r][1]+17]);
+  NUMS.forEach(([n,x,y])=>obs.push([x-8,y-19,x+8,y+3]));
+  return items.map(it=>{
+    const w=it.text.length*4.7+8,h=12,mx=(it.A[0]+it.B[0])/2,my=(it.A[1]+it.B[1])/2;
+    let best=null;
+    for(let dx=-96;dx<=96;dx+=4)for(let dy=-64;dy<=64;dy+=4){
+      const cx=mx+dx,cy=my+dy,box=[cx-w/2,cy-h/2,cx+w/2,cy+h/2];
+      if(box[0]<4||box[2]>296||box[1]<4||box[3]>366)continue;
+      let pen=0;obs.forEach(o=>pen+=ovl(box,o));
+      const sc=pen*1000+segDist(cx,cy,it.A,it.B)+Math.hypot(dx,dy)*0.05;
+      if(!best||sc<best.sc)best={cx,cy,w,h,sc,pen,box};
+    }
+    obs.push(best.box);
+    return{...it,...best};
+  });
+}
+function hlItems(P){
+  return hlRules().map(([a,b,t])=>({A:P[R.find(q=>slot(q,rot)===a)],B:P[R.find(q=>slot(q,rot)===b)],text:`${nameAt(a)} ${PHRASE[t]} ${nameAt(b)}`}));
+}
+function hlSvg(P){
+  const L=placeLabels(hlItems(P),P);
+  return L.map(l=>`<line x1="${l.A[0]}" y1="${l.A[1]}" x2="${l.B[0]}" y2="${l.B[1]}" stroke="#e5322d" stroke-width="2.5" stroke-dasharray="5 4" stroke-linecap="round"/>`).join('')
+   +L.map(l=>{
+      const dx=l.B[0]-l.A[0],dy=l.B[1]-l.A[1],len2=dx*dx+dy*dy||1,u=Math.max(0,Math.min(1,((l.cx-l.A[0])*dx+(l.cy-l.A[1])*dy)/len2)),qx=l.A[0]+u*dx,qy=l.A[1]+u*dy;
+      const lead=Math.hypot(l.cx-qx,l.cy-qy)>12?`<line x1="${qx}" y1="${qy}" x2="${l.cx}" y2="${l.cy}" stroke="#e5322d" stroke-width="1.2"/>`:'';
+      return lead+`<rect x="${l.cx-l.w/2}" y="${l.cy-l.h/2}" width="${l.w}" height="${l.h}" rx="3" fill="#c0281f"/><text x="${l.cx}" y="${l.cy+3.2}" text-anchor="middle" font-size="8.5" font-weight="700" font-family="Barlow,sans-serif" fill="#fff">${l.text}</text>`;
+   }).join('');
+}
+// Which base spot a player covers: LF/MF/RF at the net, LB/MID/RB in the back
+function spot(r){
+  const s=slot(r,rot),k=isL(r)?'L':kind(r);
+  if(front(s))return k==='OH'?'LF':k==='MB'?'MF':'RF';
+  if(k==='S'||k==='OPP')return 'RB';
+  if(lib==='mid')return k==='L'?'MID':'LB';
+  if(lib==='left')return k==='L'?'LB':'MID';
+  return k==='OH'?'LB':'MID';
+}
+const sBack=()=>!front(slot('S',rot));
+function basePos(r){
+  const sp=spot(r);
+  if(sp==='RB'&&kind(r)==='S')return[255,150];
+  return[...BASE[sp]];
+}
+function zoneOf(r){
+  const sp=spot(r);let a,b;
+  if(FRONT.includes(sp)){a=58;b=42}else{a=ZR[sp][0];b=ZR[sp][1]}
+  const m=isL(r)?1.25:kind(r)==='S'?0.6:1;
+  return[a*m*ZSCALE,b*m*ZSCALE];
+}
+// Zone outline: an ellipse that is pulled in toward the midpoint between this player and each neighbor
+function zonePath(i,P,Z){
+  const [rx,ry]=Z[i],[cx,cy]=P[i],wi=(rx+ry)/2,pts=[];
+  for(let n=0;n<40;n++){
+    const th=n/40*2*Math.PI,ux=Math.cos(th),uy=Math.sin(th);
+    let t=rx*ry/Math.hypot(ry*ux,rx*uy);
+    for(const j of R){
+      if(j===i)continue;
+      const vx=P[j][0]-cx,vy=P[j][1]-cy,D=Math.hypot(vx,vy);
+      if(D<1)continue;
+      const c=(ux*vx+uy*vy)/D;
+      if(c<=0.05)continue;
+      const wj=Z[j]?(Z[j][0]+Z[j][1])/2:35,f=Math.min(0.9,wi/(wi+wj)+OVERLAP);
+      t=Math.min(t,f*D/c);
+    }
+    pts.push((cx+ux*t).toFixed(1)+' '+(cy+uy*t).toFixed(1));
+  }
+  return 'M'+pts.join('L')+'Z';
+}
+function iso(v){const b=[];v.forEach(x=>{b.push({s:x,n:1});while(b.length>1&&b[b.length-2].s/b[b.length-2].n>b[b.length-1].s/b[b.length-1].n){const t=b.pop();b[b.length-1].s+=t.s;b[b.length-1].n+=t.n}});return b.flatMap(o=>Array(o.n).fill(o.s/o.n))}
+function solve(T,srv){
+  const sl={},P={};
+  R.forEach(r=>{sl[slot(r,rot)]=r;P[r]=[...T[r]]});
+  [[4,3,2],[5,6,1]].forEach(row=>{
+    const xs=iso(row.map((s,i)=>P[sl[s]][0]-i*M)).map((v,i)=>v+i*M);
+    row.forEach((s,i)=>P[sl[s]][0]=Math.min(272,Math.max(28,xs[i])));
+  });
+  [[4,5],[3,6],[2,1]].forEach(([f,b])=>{
+    if(srv&&b===1)return;
+    const A=P[sl[f]],B=P[sl[b]];
+    if(B[1]<A[1]+V){B[1]=A[1]+V;if(B[1]>326){B[1]=326;A[1]=326-V}}
+  });
+  if(srv)P[sl[1]][1]=348;
+  return P;
+}
+const clone=P=>{const o={};R.forEach(r=>o[r]=[P[r][0],P[r][1]]);return o};
+const deep=o=>JSON.parse(JSON.stringify(o));
+const showZones=()=>pos===1&&view==='base';
+function stateKey(){
+  if(pos!==1)return null;
+  return view==='receive'?`rx|${rot}`:view==='serving'?`sv|${rot}|${lib}`:`bs|${rot}|${lib}`;
+}
+// Base for this rotation and libero setting, from edits if any
+function baseTarget(){
+  const e=EDITS[`bs|${rot}|${lib}`];if(e)return clone(e);
+  const T={};R.forEach(r=>T[r]=basePos(r));return T;
+}
+function defaults(){
+  const T={};
+  if(pos!==1){R.forEach(r=>{const s=slot(r,rot);T[r]=[SX[s],front(s)?80:240]});return T}
+  if(view==='receive')return clone(RECV[rot]);
+  if(view==='base')return baseTarget();
+  // Serving: start from base, then obey the overlap rules; the server goes behind the end line
+  const B=baseTarget();R.forEach(r=>T[r]=slot(r,rot)===1?[235,348]:B[r]);
+  return solve(T,true);
+}
+function target(){const k=stateKey(),e=k&&EDITS[k];return e?clone(e):defaults()}
+function issues(P){
+  if(pos!==1||view==='base')return[];
+  const sl={},out=[],srv=view==='serving';
+  R.forEach(r=>sl[slot(r,rot)]=r);
+  [[4,3],[3,2],[5,6],[6,1]].forEach(([a,b])=>{if(srv&&b===1)return;if(P[sl[b]][0]-P[sl[a]][0]<1)out.push(`${sl[a]} (position ${a}) must stay left of ${sl[b]} (position ${b})`)});
+  [[4,5],[3,6],[2,1]].forEach(([f,b])=>{if(srv&&b===1)return;if(P[sl[b]][1]-P[sl[f]][1]<1)out.push(`${sl[f]} (position ${f}) must stay in front of ${sl[b]} (position ${b})`)});
+  return out;
+}
+// Team file and local drafts
+const KEY_RX=/^(rx\|[0-5]|(sv|bs)\|[0-5]\|(left|mid|off))$/;
+const okPos=p=>p&&R.every(r=>Array.isArray(p[r])&&p[r].length===2&&p[r].every(Number.isFinite));
+function cleanViews(v){const o={};if(v&&typeof v==='object')for(const[k,p]of Object.entries(v))if(KEY_RX.test(k)&&okPos(p))o[k]=clone(p);return o}
+function readFile(d){return d&&d.format==='tmt-rotations'&&d.views&&typeof d.views==='object'?{t:+d.updated||0,views:cleanViews(d.views)}:null}
+const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}};
+const lsSet=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+// Edits saved by the older version of this page (before team files): keep receive, serve and base views
+function oldDraft(){
+  const o=lsGet(LS_OLD);if(!o||!o._t)return null;const v={};
+  for(const[k,p]of Object.entries(o)){
+    if(/^(rx|sv)\|/.test(k))v[k]=p;
+    const m=k.match(/^df\|(\d)\|(\w+)\|base$/);if(m)v[`bs|${m[1]}|${m[2]}`]=p;
+  }
+  return{t:o._t,views:cleanViews(v)};
+}
+function saveDraft(){draft=true;lsSet(LS,{format:'tmt-rotations',version:1,updated:Date.now(),views:EDITS})}
+async function loadTeam(){
+  let st='missing',f=null;
+  try{const r=await fetch(TEAM_URL,{cache:'no-cache'});if(r.ok){st='invalid';f=readFile(await r.json());if(f)st='loaded'}}catch(e){}
+  teamState=st;TEAM=f?f.views:{};TEAM_T=f?f.t:0;
+  const d=readFile(lsGet(LS))||oldDraft();
+  if(d&&d.t>TEAM_T){EDITS=deep(d.views);draft=true}else{EDITS=deep(TEAM);draft=false}
+  render();
+}
+function exportText(){
+  const ks=Object.keys(EDITS).sort();
+  return '{\n  "format": "tmt-rotations",\n  "version": 1,\n  "updated": '+Date.now()+',\n  "views": {'+ks.map(k=>'\n    '+JSON.stringify(k)+': '+JSON.stringify(EDITS[k])).join(',')+'\n  }\n}\n';
+}
+function moveTo(r,x,y){
+  CUR[r]=[Math.round(Math.min(286,Math.max(14,x))),Math.round(Math.min(358,Math.max(14,y)))];
+  draw(CUR);showWarn(CUR);
+}
+function commit(){
+  const k=stateKey();if(!k)return;
+  EDITS[k]=clone(CUR);saveDraft();updateUI(CUR);
+}
+function resetView(){const k=stateKey();if(k&&EDITS[k]){delete EDITS[k];saveDraft()}render()}
+function revert(){EDITS=deep(TEAM);draft=false;lsSet(LS,null);lsSet(LS_OLD,null);render()}
+// Drawing
+const svg=document.getElementById('court');
+let h='<defs><clipPath id="cc"><rect x="20" y="20" width="260" height="310"/></clipPath><filter id="bl" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="2.5"/></filter></defs>';
+h+='<rect x="20" y="20" width="260" height="310" rx="4" fill="var(--court)"/><g clip-path="url(#cc)"><g id="zones" filter="url(#bl)">'+R.map(r=>`<path id="z-${r}" fill-opacity=".3"/>`).join('')+'</g></g>';
+h+='<line x1="20" y1="123" x2="280" y2="123" stroke="var(--line)" stroke-width="2.5" opacity=".7"/>';
+h+='<rect x="20" y="20" width="260" height="310" fill="none" stroke="var(--line)" stroke-width="3"/>';
+h+='<rect x="12" y="12" width="276" height="8" rx="3" fill="var(--ink)"/>';
+NUMS.forEach(([n,x,y])=>{
+  h+=`<text x="${x}" y="${y}" text-anchor="middle" font-size="22" font-weight="700" fill="var(--line)" opacity=".4" font-family="Barlow Condensed,sans-serif">${n}</text>`;
+});
+h+='<g id="hl"></g>';
+R.forEach(r=>{h+=`<g class="p" id="p-${r}"><circle r="15" stroke="var(--line)" stroke-width="2.5"/><text text-anchor="middle" y="4" font-weight="700" font-family="Barlow Condensed,sans-serif"></text></g>`});
+svg.innerHTML=h;
+const col=k=>`var(--${k})`;
+function setLabels(){
+  R.forEach(r=>{
+    const g=document.getElementById('p-'+r),l=isL(r),k=l?'L':kind(r);
+    g.children[0].setAttribute('fill',col(k));
+    const t=g.children[1];t.textContent=l?'L':r;t.setAttribute('font-size',t.textContent.length>2?11:13);
+    t.setAttribute('fill',k==='OPP'?'#14213d':'#fff');
+    document.getElementById('z-'+r).setAttribute('fill',col(k));
+  });
+}
+function draw(P){
+  R.forEach(r=>{document.getElementById('p-'+r).style.transform=`translate(${P[r][0]}px,${P[r][1]}px)`});
+  document.getElementById('hl').innerHTML=hlSvg(P);
+  const z=showZones();
+  document.getElementById('zones').style.display=z?'':'none';
+  if(z){
+    const Z={};R.forEach(r=>Z[r]=zoneOf(r));
+    R.forEach(r=>document.getElementById('z-'+r).setAttribute('d',zonePath(r,P,Z)));
+  }
+}
+function tween(T){
+  const from=clone(CUR),t0=performance.now(),id=++tweenId;
+  const step=now=>{
+    if(id!==tweenId)return;
+    let u=Math.min(1,(now-t0)/550);u=u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
+    R.forEach(r=>{CUR[r]=[from[r][0]+(T[r][0]-from[r][0])*u,from[r][1]+(T[r][1]-from[r][1])*u]});
+    draw(CUR);
+    if(u<1)requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function showWarn(P){document.getElementById('warn').textContent=edit?issues(P).join('. '):''}
+const same=(a,b)=>!!a&&!!b&&JSON.stringify(clone(a))===JSON.stringify(clone(b));
+function fmtDate(t){try{return new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}catch(e){return''}}
+function updateUI(P){
+  const $=id=>document.getElementById(id),s=slot('S',rot),on=(sel,fn)=>document.querySelectorAll(sel).forEach(b=>b.setAttribute('aria-pressed',fn(b)));
+  const libOn=pos===1&&lib!=='off';
+  $('head').innerHTML=`<b>Rotation ${rot+1}:</b> setter starts in position ${s} (${front(s)?'front':'back'} row).`+(libOn?` Libero replaces ${SUB[rot]}.`:'');
+  let t;
+  if(pos!==1)t='Plain rotation order with no positional play. Everyone stands where the rotation puts them. Compare this with 5-1 positioning.';
+  else if(view==='receive')t=NOTES[rot]+(hlRules().length?' Key rules: '+hlText().join(', ')+'.':'');
+  else if(view==='serving')t='Everyone starts as close to their base position as the overlap rules allow. The server stands behind the end line.';
+  else t='Where everyone sets up once the ball crosses the net: front row ready to block, wings short, middle back deep.'+(sBack()?'':' The setter is in the front row, so the opposite plays right back.');
+  $('tip').textContent=t;
+  on('#rot button',b=>+b.dataset.i===rot);on('#view button',b=>b.dataset.v===view);on('#sys button',b=>+b.dataset.s===pos);
+  on('#lib button',b=>b.dataset.l===lib);on('#editBtn',()=>edit);
+  const k=stateKey(),p=pos===1;
+  ['libWrap','view','editRow'].forEach(i=>$(i).hidden=!p);
+  $('serveNote').hidden=p&&view==='base';$('baseNote').hidden=!(p&&view==='base');
+  $('editPanel').hidden=!(edit&&p);if(!p)$('exp').hidden=true;
+  svg.classList.toggle('editing',edit&&!!k);
+  if(k){
+    const e=EDITS[k],src=!e?'the default positions':same(e,TEAM[k])?'the team file':'your edits (saved in this browser)';
+    $('editMsg').textContent=`Drag a player to move them. This view is using ${src}.`;
+  }
+  $('fileMsg').textContent=teamState==='loaded'?`Team file last updated ${fmtDate(TEAM_T)}.`:teamState==='invalid'?'The team file could not be read.':teamState==='missing'?'No team file is published yet.':'';
+  $('revert').textContent=confirmRevert?'Tap again to discard your edits':'Revert to team file';
+  $('revert').disabled=!draft;
+  $('status').textContent=draft?'Showing your local edits, which are not in the team file yet.'+(edit?' Export JSON to share them.':''):teamState==='missing'?'No team positions are published yet, so these are default positions.':teamState==='invalid'?'The team positions file could not be read, so these are default positions.':'';
+  $('status').hidden=!$('status').textContent;
+  showWarn(P||CUR);
+}
+function render(){
+  const T=target();
+  setLabels();updateUI(T);
+  const still=window.__noAnim||!CUR.S||(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+  if(still){tweenId++;CUR=clone(T);draw(CUR)}else tween(T);
+}
+// Controls
+const rotEl=document.getElementById('rot');
+for(let i=0;i<6;i++){const b=document.createElement('button');b.textContent='R'+(i+1);b.dataset.i=i;b.setAttribute('aria-label','Rotation '+(i+1));b.onclick=()=>{rot=i;confirmRevert=false;render()};rotEl.appendChild(b)}
+const wire=(sel,fn)=>document.querySelectorAll(sel).forEach(b=>b.onclick=()=>{fn(b);confirmRevert=false;render()});
+wire('#sys button',b=>{pos=+b.dataset.s;if(!pos)edit=false});wire('#view button',b=>view=b.dataset.v);wire('#lib button',b=>lib=b.dataset.l);
+const $=id=>document.getElementById(id);
+$('editBtn').onclick=()=>{edit=!edit;confirmRevert=false;$('exp').hidden=true;render()};
+$('resetView').onclick=()=>{confirmRevert=false;resetView()};
+$('revert').onclick=()=>{if(confirmRevert){confirmRevert=false;revert()}else{confirmRevert=true;updateUI()}};
+$('exportBtn').onclick=()=>{$('expText').value=exportText();$('exp').hidden=false;$('expText').select()};
+$('expClose').onclick=()=>{$('exp').hidden=true};
+$('expCopy').onclick=()=>{
+  const ta=$('expText');ta.select();
+  try{if(navigator.clipboard)navigator.clipboard.writeText(ta.value);else document.execCommand('copy')}catch(e){try{document.execCommand('copy')}catch(e2){}}
+};
+$('expDl').onclick=()=>{
+  try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([$('expText').value],{type:'application/json'}));a.download='rotations.json';document.body.appendChild(a);a.click();a.remove()}catch(e){}
+};
+$('importBtn').onclick=()=>$('importFile').click();
+$('importFile').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  let d=null;try{d=readFile(JSON.parse(await f.text()))}catch(err){}
+  if(!d){$('warn').textContent='That file is not a rotations JSON exported from this page.';return}
+  EDITS=d.views;saveDraft();render();
+};
+function svgPt(e){
+  try{const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;return pt.matrixTransform(svg.getScreenCTM().inverse())}
+  catch(err){return{x:e.clientX,y:e.clientY}}
+}
+svg.addEventListener('pointerdown',e=>{
+  if(!edit||!stateKey())return;
+  const g=e.target.closest&&e.target.closest('g.p');if(!g)return;
+  const r=g.id.slice(2),pt=svgPt(e);
+  tweenId++;CUR=target();draw(CUR);
+  drag={r,dx:CUR[r][0]-pt.x,dy:CUR[r][1]-pt.y};
+  try{svg.setPointerCapture(e.pointerId)}catch(err){}
+  e.preventDefault();
+});
+svg.addEventListener('pointermove',e=>{if(!drag)return;const pt=svgPt(e);moveTo(drag.r,pt.x+drag.dx,pt.y+drag.dy)});
+const endDrag=()=>{if(drag){drag=null;commit()}};
+svg.addEventListener('pointerup',endDrag);svg.addEventListener('pointercancel',endDrag);
+render();
+loadTeam();
+</script>
+</body>
+</html>

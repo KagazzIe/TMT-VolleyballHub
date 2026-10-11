@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clip Marker · TMT: Volleyball Hub</title>
+<style>
+:root{--bg:#eef1f5;--panel:#fff;--ink:#14202e;--mut:#66758a;--line:#d5dbe4;--acc:#1f5eff;--ok:#1b9e6b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit;background:#fff;border:1px solid var(--line);border-radius:6px;padding:6px 9px}
+button{cursor:pointer}button:hover{border-color:var(--acc)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+button.pri{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:700}
+header{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:16px;margin:0 8px 0 0}
+#url{flex:1;min-width:220px}
+#warn{display:none;background:#fff3cd;padding:8px 14px;border-bottom:1px solid #e6d58f}
+main{display:grid;grid-template-columns:min(var(--pct,62%),calc(100% - 344px)) minmax(0,1fr);gap:14px;padding:14px}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+.vid{position:relative;aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden}
+.vid iframe{position:absolute;inset:0;width:100%;height:100%}
+#shield{position:absolute;inset:0;cursor:pointer}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.sizectl{display:flex;align-items:center;gap:6px;color:var(--mut);margin-left:auto}
+.sizectl input{width:120px;padding:0}
+@media(max-width:900px){.sizectl{display:none}}
+.tag{display:inline-flex;align-items:center;gap:2px;background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:1px 3px 1px 10px}
+.tag button{border:0;background:none;padding:0 6px;color:var(--mut)}
+dialog{border:1px solid var(--line);border-radius:12px;padding:16px;width:min(560px,94vw);max-height:86vh;overflow:auto;color:var(--ink)}
+dialog::backdrop{background:rgba(20,32,46,.45)}
+#hkbody h3{margin:14px 0 6px;font-size:14px}
+.hkrow{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:3px 0}
+.hkrow input{flex:1;min-width:0}
+.keybtn{min-width:130px}
+.keybtn.cap{background:var(--acc);color:#fff;border-color:var(--acc)}
+#seek{flex:1;min-width:140px;padding:0}
+#time{font-variant-numeric:tabular-nums;color:var(--mut);min-width:100px;text-align:right}
+.markbtn{width:100%;margin-top:10px;padding:12px;font-size:16px}
+.keys{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 12px;margin-top:10px;color:var(--mut);font-size:12.5px}
+kbd{background:var(--bg);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;color:var(--ink);font-size:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.chip{font-size:12px;padding:2px 9px;border:1px solid var(--line);border-radius:99px;color:var(--mut)}
+.chip b{color:var(--ink)}
+#list{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 220px);overflow:auto}
+.clip{border:1px solid var(--line);border-radius:8px;padding:8px;display:grid;gap:6px}
+.clip.sel{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.row input[type=number]{width:74px}
+.row .note{flex:1;min-width:120px}
+.mut{color:var(--mut)}
+.empty{color:var(--mut);padding:24px 8px;text-align:center}
+details{margin-top:10px}summary{cursor:pointer;color:var(--mut)}
+textarea{width:100%;min-height:150px;margin-top:6px}
+.cfg{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.cfg input[type=number]{width:64px}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ok);color:#fff;padding:6px 16px;border-radius:99px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<div id="warn">YouTube blocks playback on pages opened straight from a file. Run <code>python3 -m http.server</code> in this folder and open <code>http://localhost:8000/</code>, or host it on GitHub Pages.</div>
+<header>
+  <h1><a href="../../" style="color:inherit;text-decoration:none" title="Hub home">Clip Marker</a></h1>
+  <input id="url" placeholder="Paste a YouTube link">
+  <button id="load" class="pri">Load video</button>
+  <input id="gname" placeholder="Game name" aria-label="Game name" style="width:170px">
+  <input id="gdate" type="date" aria-label="Game date">
+  <button id="newgame">New game</button>
+  <button id="hkopen">Hotkeys</button>
+  <label class="sizectl">Video size <input type="range" id="size" min="40" max="80" step="1" aria-label="Video size"></label>
+</header>
+<main>
+  <section class="panel">
+    <div class="vid"><div id="player"></div><div id="shield" title="Click to play or pause"></div></div>
+    <div class="bar">
+      <button id="pp" aria-label="Play or pause">▶</button>
+      <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Seek">
+      <span id="time">0:00 / 0:00</span>
+      <select id="rate" aria-label="Speed"></select>
+    </div>
+    <button id="mark" class="pri markbtn">Mark moment (M)</button>
+    <div class="keys" id="keys"></div>
+    <details>
+      <summary>Roster and clip length</summary>
+      <div class="cfg">
+        <label>Seconds before mark <input id="pre" type="number" min="0" step="1"></label>
+        <label>Seconds after <input id="post" type="number" min="0" step="1"></label>
+      </div>
+      <p class="mut" style="margin:10px 0 0">Roster, one name per line. Player keys are set under Hotkeys.</p>
+      <textarea id="roster"></textarea>
+    </details>
+  </section>
+  <section class="panel">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <strong id="count">0 clips</strong>
+      <span class="row">
+        <button id="dl" class="pri">Download JSON</button>
+        <button id="cp">Copy</button>
+        <button id="imp">Import</button>
+        <input type="file" id="file" accept=".json" hidden>
+      </span>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div id="list"></div>
+  </section>
+</main>
+<dialog id="hk" aria-label="Hotkeys">
+  <div class="row" style="justify-content:space-between"><strong>Hotkeys and actions</strong><button id="hkx" class="pri">Done</button></div>
+  <p class="mut" style="margin:6px 0 0">Click a key, then press the new key. Player keys follow each player's place in the roster.</p>
+  <p id="hkmsg" style="margin:6px 0 0;color:#b42318;min-height:1.4em"></p>
+  <div id="hkbody"></div>
+  <div class="row" style="margin-top:12px"><button id="hkadd" hidden>Add action</button><button id="hkunlock">Edit action list</button><button id="hkreset">Reset to defaults</button></div>
+</dialog>
+<div id="toast"></div>
+<script>
+const DEFAULT_ROSTER=['Player 1','Player 2','Player 3','Player 4','Player 5','Player 6','Player 7'];
+const DEFAULT_ACTIONS=[['n','Serve'],['j','Receive'],['k','Set'],['l','Hit'],[';','Block']];
+const DEFAULT_PKEYS=['1','2','3','4','!','@','#'];
+function newId(){return(Math.random().toString(36)+'00000000').slice(2,10)}
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+const RATES=[0.25,0.5,0.75,1,1.25,1.5,2];
+const KEY='clipmarker:v1';
+const $=s=>document.querySelector(s);
+let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+const SAVED=S;
+S=Object.assign({game:{id:newId(),name:'',date:today(),videoId:''},roster:[...DEFAULT_ROSTER],actions:DEFAULT_ACTIONS.map(a=>[...a]),size:62,cmdkeys:{},pkeys:[],clips:[],pre:6,post:4},S||{});
+if(S.match){S.game={id:newId(),name:S.match.title||'',date:S.match.date||today(),videoId:S.match.videoId||''};delete S.match}
+if(SAVED&&SAVED.cfgv!==3){S.actions=DEFAULT_ACTIONS.map(a=>[...a]);S.pkeys=[];S.clips.forEach(c=>{if(c.action==='Spike')c.action='Hit'})}
+S.cfgv=3;
+if(S.roster.every((n,i)=>n==='Player '+(i+1)))S.roster=[...DEFAULT_ROSTER];
+let ACTIONS=S.actions;
+if(!(S.size>=40&&S.size<=80))S.size=62;
+S.clips.forEach(c=>{if(!Array.isArray(c.players))c.players=c.player?[c.player]:[];delete c.player});
+let sel=null,yt=null,ready=false,apiReady=false,previewEnd=null,dragging=false;
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const r1=n=>Math.round(n*10)/10;
+const pad=n=>String(n).padStart(2,'0');
+const fmt=t=>{t=Math.max(0,t|0);const h=t/3600|0,m=(t%3600)/60|0,s=t%60;return (h?h+':'+pad(m):m)+':'+pad(s)};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const sortClips=()=>S.clips.sort((a,b)=>a.start-b.start);
+const cur=()=>ready?yt.getCurrentTime():0;
+const dur=()=>ready?yt.getDuration():0;
+let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),1200)};
+
+if(location.protocol==='file:')$('#warn').style.display='block';
+
+/* YouTube player */
+const tag=document.createElement('script');tag.src='https://www.youtube.com/iframe_api';document.head.appendChild(tag);
+window.onYouTubeIframeAPIReady=()=>{apiReady=true;if(S.game.videoId)mount(S.game.videoId)};
+function mount(id){
+  if(yt&&ready){yt.loadVideoById(id);return}
+  if(yt)return;
+  yt=new YT.Player('player',{videoId:id,playerVars:{controls:0,disablekb:1,rel:0,modestbranding:1,playsinline:1},
+    events:{onReady:()=>{ready=true},onStateChange:syncPP}});
+}
+function parseId(v){const m=v.match(/(?:v=|youtu\.be\/|embed\/|shorts\/|live\/)([\w-]{11})/)||v.trim().match(/^([\w-]{11})$/);return m&&m[1]}
+$('#load').onclick=()=>{
+  const id=parseId($('#url').value);
+  if(!id)return alert('Could not find a YouTube video ID in that link.');
+  if(id!==S.game.videoId&&S.clips.length&&!confirm('A different video starts a new game and clears the current clips. Download the JSON first if you need it. Continue?'))return;
+  if(id!==S.game.videoId&&S.clips.length)freshGame();
+  S.game.videoId=id;save();render();if(apiReady)mount(id);
+};
+
+/* Transport */
+function syncPP(){$('#pp').textContent=ready&&yt.getPlayerState()===1?'❚❚':'▶'}
+function toggle(){if(!ready)return;previewEnd=null;yt.getPlayerState()===1?yt.pauseVideo():yt.playVideo()}
+function seekBy(d){if(ready)yt.seekTo(Math.max(0,cur()+d),true)}
+function setRate(r){if(!ready)return;yt.setPlaybackRate(r);$('#rate').value=r}
+function stepRate(d){if(!ready)return;const i=Math.max(0,Math.min(RATES.length-1,RATES.indexOf(yt.getPlaybackRate())+d));setRate(RATES[i])}
+$('#rate').innerHTML=RATES.map(r=>`<option value="${r}" ${r===1?'selected':''}>${r}x</option>`).join('');
+$('#rate').onchange=e=>{setRate(+e.target.value);e.target.blur()};
+$('#pp').onclick=toggle;
+$('#shield').onclick=toggle;
+$('#seek').oninput=e=>{dragging=true;previewEnd=null;if(ready)yt.seekTo(e.target.value/1000*dur(),true)};
+$('#seek').onchange=e=>{dragging=false;e.target.blur()};
+setInterval(()=>{
+  if(!ready)return;
+  const t=cur(),d=dur();
+  if(previewEnd!=null&&t>=previewEnd){yt.pauseVideo();previewEnd=null}
+  if(!dragging&&d)$('#seek').value=t/d*1000;
+  $('#time').textContent=fmt(t)+' / '+fmt(d);
+  syncPP();
+},100);
+
+/* Clips */
+function mark(){
+  if(!ready)return toast('Load a video first');
+  const t=cur();
+  const c={id:Date.now().toString(36),start:r1(Math.max(0,t-S.pre)),end:r1(Math.min(dur()||1e9,t+S.post)),players:[],action:'',note:''};
+  S.clips.push(c);sortClips();sel=c.id;save();render();toast('Marked at '+fmt(t));
+}
+$('#mark').onclick=mark;
+function preview(c){
+  if(!ready)return;
+  select(c.id);previewEnd=null;
+  yt.seekTo(c.start,true);yt.playVideo();
+  setTimeout(()=>{previewEnd=c.end},400);
+}
+function select(id){sel=id;document.querySelectorAll('.clip').forEach(x=>x.classList.toggle('sel',x.dataset.id===id))}
+function move(d){
+  if(!S.clips.length)return;
+  const i=S.clips.findIndex(c=>c.id===sel);
+  const n=Math.max(0,Math.min(S.clips.length-1,i<0?0:i+d));
+  select(S.clips[n].id);document.querySelector('.clip.sel')?.scrollIntoView({block:'nearest'});
+}
+function refreshClip(el,c){
+  el.querySelector('[data-f=start]').value=c.start;
+  el.querySelector('[data-f=end]').value=c.end;
+  el.querySelector('.span').textContent=fmt(c.start)+'–'+fmt(c.end)+' · '+r1(c.end-c.start)+'s';
+}
+const find=el=>S.clips.find(x=>x.id===el.dataset.id);
+$('#list').addEventListener('focusin',e=>{const el=e.target.closest('.clip');if(el)select(el.dataset.id)});
+$('#list').addEventListener('click',e=>{
+  const el=e.target.closest('.clip');if(!el)return;
+  const c=find(el),a=e.target.dataset.a;
+  select(c.id);
+  if(a==='play')preview(c);
+  else if(a==='del'){S.clips=S.clips.filter(x=>x!==c);if(sel===c.id)sel=null;save();render()}
+  else if(a==='rm'){c.players=c.players.filter(p=>p!==e.target.dataset.p);save();renderList();renderChips()}
+  else if(a==='s-now'){c.start=r1(cur());if(c.end<=c.start)c.end=r1(c.start+1);save();refreshClip(el,c)}
+  else if(a==='e-now'){c.end=r1(cur());if(c.end<=c.start)c.start=r1(Math.max(0,c.end-1));save();refreshClip(el,c)}
+});
+$('#list').addEventListener('input',e=>{
+  if(e.target.dataset.f!=='note')return;
+  const c=find(e.target.closest('.clip'));c.note=e.target.value;save();
+});
+$('#list').addEventListener('change',e=>{
+  const f=e.target.dataset.f;if(!f||f==='note')return;
+  const el=e.target.closest('.clip'),c=find(el);
+  if(f==='start'||f==='end'){
+    c[f]=r1(Math.max(0,+e.target.value||0));
+    if(c.end<=c.start){f==='start'?c.end=r1(c.start+1):c.start=r1(Math.max(0,c.end-1))}
+    save();refreshClip(el,c);
+  }else if(f==='addplayer'){
+    if(e.target.value&&!c.players.includes(e.target.value))c.players.push(e.target.value);
+    save();renderList();renderChips();
+  }else{c[f]=e.target.value;save();renderChips()}
+});
+
+/* Rendering */
+function renderKeys(){
+  $('#keys').innerHTML=allBinds().filter(b=>b.key).map(b=>`<span><kbd>${esc(pretty(b.key))}</kbd> ${esc(b.short)}</span>`).join('');
+}
+function renderChips(){
+  $('#count').textContent=S.clips.length+(S.clips.length===1?' clip':' clips');
+  const cnt={};S.clips.forEach(c=>{(c.players.length?c.players:['Untagged']).forEach(p=>{cnt[p]=(cnt[p]||0)+1})});
+  const names=[...new Set([...S.roster,...S.clips.flatMap(c=>c.players)])];
+  $('#chips').innerHTML=[...names,'Untagged'].map(n=>`<span class="chip">${esc(n)} <b>${cnt[n]||0}</b></span>`).join('');
+}
+function renderList(){
+  const players=[...new Set([...S.roster,...S.clips.flatMap(c=>c.players)])];
+  const acts=[...new Set([...ACTIONS.map(a=>a[1]),...S.clips.map(c=>c.action).filter(Boolean)])];
+  $('#list').innerHTML=S.clips.length?S.clips.map((c,i)=>`
+  <div class="clip ${c.id===sel?'sel':''}" data-id="${c.id}">
+    <div class="row"><button data-a="play" title="Preview (Enter)">▶</button><strong>Clip ${i+1}</strong>
+      <span class="mut span">${fmt(c.start)}–${fmt(c.end)} · ${r1(c.end-c.start)}s</span><span style="flex:1"></span>
+      <button data-a="del" title="Delete clip" aria-label="Delete clip">✕</button></div>
+    <div class="row"><label class="mut">Start <input type="number" step="0.5" min="0" data-f="start" value="${c.start}"></label>
+      <button data-a="s-now" title="Set start to the current video time">Use now</button>
+      <label class="mut">End <input type="number" step="0.5" min="0" data-f="end" value="${c.end}"></label>
+      <button data-a="e-now" title="Set end to the current video time">Use now</button></div>
+    <div class="row">
+      ${c.players.map(n=>`<span class="tag">${esc(n)}<button data-a="rm" data-p="${esc(n)}" aria-label="Remove ${esc(n)}">✕</button></span>`).join('')}<select data-f="addplayer" aria-label="Add player"><option value="">${c.players.length?'Add another player':'Add player'}</option>${players.filter(n=>!c.players.includes(n)).map(n=>`<option>${esc(n)}</option>`).join('')}</select></div>
+    <div class="row">
+      <select data-f="action" aria-label="Action"><option value="">Action</option>${acts.map(n=>`<option ${n===c.action?'selected':''}>${esc(n)}</option>`).join('')}</select>
+      <input class="note" data-f="note" placeholder="Note" value="${esc(c.note)}"></div>
+  </div>`).join(''):'<div class="empty">No clips yet. Load a video, then press M right after a good moment.</div>';
+  document.querySelector('.clip.sel')?.scrollIntoView({block:'nearest'});
+}
+function render(){renderKeys();renderChips();renderList()}
+
+/* Hotkeys */
+const CMDS=[
+  ['mark','Mark moment','m'],['toggle','Play or pause','space'],
+  ['back5','Skip back 5s','arrowleft'],['fwd5','Skip forward 5s','arrowright'],
+  ['back1','Skip back 1s','shift+arrowleft'],['fwd1','Skip forward 1s','shift+arrowright'],
+  ['prev','Select previous clip','arrowup'],['next','Select next clip','arrowdown'],
+  ['replay','Replay selected clip','enter'],['slower','Slower','['],['faster','Faster',']']
+];
+const ckey=id=>S.cmdkeys[id]??CMDS.find(c=>c[0]===id)[2];
+const pkey=i=>S.pkeys[i]??(DEFAULT_PKEYS[i]||'');
+const curClip=()=>S.clips.find(x=>x.id===sel);
+const RUN={mark,toggle,back5:()=>seekBy(-5),fwd5:()=>seekBy(5),back1:()=>seekBy(-1),fwd1:()=>seekBy(1),
+  prev:()=>move(-1),next:()=>move(1),replay:()=>{const c=curClip();if(c)preview(c)},slower:()=>stepRate(-1),faster:()=>stepRate(1)};
+function togglePlayer(n){
+  const c=curClip();if(!c)return toast('Mark a clip first');
+  c.players=c.players.includes(n)?c.players.filter(p=>p!==n):[...c.players,n];
+  save();renderList();renderChips();
+}
+function setAction(l){const c=curClip();if(!c)return toast('Mark a clip first');c.action=l;save();renderList()}
+const PRETTY={space:'Space',arrowleft:'←',arrowright:'→',arrowup:'↑',arrowdown:'↓',enter:'Enter',escape:'Esc',backspace:'Backspace',tab:'Tab'};
+const pretty=k=>k.split('+').map(p=>PRETTY[p]||(p.length===1?p.toUpperCase():p[0].toUpperCase()+p.slice(1))).join(' + ');
+function combo(e){const k=e.key===' '?'space':e.key.toLowerCase();return(e.shiftKey&&k.length>1?'shift+':'')+k}
+function allBinds(){
+  const a=[];
+  CMDS.forEach(([id,l])=>a.push({t:'cmd',id,label:l,short:l,key:ckey(id),run:RUN[id]}));
+  S.roster.forEach((n,i)=>a.push({t:'player',id:i,label:'Player '+n,short:n,key:pkey(i),run:()=>togglePlayer(n)}));
+  ACTIONS.forEach((x,i)=>a.push({t:'act',id:i,label:'Action '+x[1],short:x[1],key:x[0],run:()=>setAction(x[1])}));
+  return a;
+}
+const usedBy=(k,cap)=>{const h=allBinds().find(b=>b.key===k&&!(b.t===cap.t&&b.id===cap.id));return h&&h.label};
+function setBinding(cap,k){if(cap.t==='cmd')S.cmdkeys[cap.id]=k;else if(cap.t==='player')S.pkeys[cap.id]=k;else ACTIONS[cap.id][0]=k}
+let capturing=null,unlocked=false;
+const hkMsg=t=>{$('#hkmsg').textContent=t};
+const keyBtn=(t,id,key)=>{const on=capturing&&capturing.t===t&&capturing.id===id;
+  return `<button class="keybtn ${on?'cap':''}" data-hk="${t}:${id}">${on?'Press a key (Esc cancels)':key?esc(pretty(key)):'Not set'}</button>`};
+function renderHk(){
+  $('#hkbody').innerHTML=
+    '<h3>Video and clips</h3>'+CMDS.map(([id,l])=>`<div class="hkrow"><span>${l}</span>${keyBtn('cmd',id,ckey(id))}</div>`).join('')+
+    '<h3>Tag players</h3>'+S.roster.map((n,i)=>`<div class="hkrow"><span>${esc(n)}</span>${keyBtn('player',i,pkey(i))}</div>`).join('')+
+    '<h3>Actions</h3>'+ACTIONS.map((a,i)=>unlocked
+      ?`<div class="hkrow"><input data-ai="${i}" value="${esc(a[1])}" aria-label="Action name">${keyBtn('act',i,a[0])}<button data-adel="${i}" aria-label="Delete action">✕</button></div>`
+      :`<div class="hkrow"><span>${esc(a[1])}</span>${keyBtn('act',i,a[0])}</div>`).join('');
+  $('#hkadd').hidden=!unlocked;$('#hkunlock').hidden=unlocked;
+}
+$('#hkbody').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.hk){const [t,id]=b.dataset.hk.split(':');capturing={t,id:t==='cmd'?id:+id};hkMsg('');renderHk()}
+  else if(b.dataset.adel!==undefined){ACTIONS.splice(+b.dataset.adel,1);save();render();renderHk()}
+});
+$('#hkbody').addEventListener('change',e=>{
+  const i=e.target.dataset.ai;if(i===undefined)return;
+  const old=ACTIONS[i][1],nv=e.target.value.trim();
+  if(!nv){e.target.value=old;return}
+  S.clips.forEach(c=>{if(c.action===old)c.action=nv});
+  ACTIONS[i][1]=nv;save();render();
+});
+$('#hkopen').onclick=()=>{capturing=null;unlocked=false;hkMsg('');renderHk();$('#hk').showModal()};
+$('#hkx').onclick=()=>$('#hk').close();
+$('#hk').addEventListener('close',()=>{capturing=null});
+$('#hk').addEventListener('cancel',e=>{if(capturing)e.preventDefault()});
+$('#hkunlock').onclick=()=>{if(confirm('The five actions (Serve, Receive, Set, Hit, Block) stay the same across games so the team page can group them. Edit the list anyway?')){unlocked=true;renderHk()}};
+$('#hkadd').onclick=()=>{ACTIONS.push(['','New action']);save();render();renderHk()};
+$('#hkreset').onclick=()=>{
+  if(!confirm('Reset all hotkeys and actions to their defaults?'))return;
+  S.cmdkeys={};S.pkeys=[];S.actions=DEFAULT_ACTIONS.map(a=>[...a]);ACTIONS=S.actions;
+  capturing=null;save();render();renderHk();
+};
+
+document.addEventListener('click',e=>{if(e.target.matches('button'))e.target.blur()});
+document.addEventListener('keydown',e=>{
+  if(capturing){
+    e.preventDefault();e.stopPropagation();
+    if(['shift','control','alt','meta'].includes(e.key.toLowerCase()))return;
+    if(e.key==='Escape'){capturing=null;hkMsg('');renderHk();return}
+    if(e.ctrlKey||e.metaKey||e.altKey)return hkMsg('Use a single key, or Shift plus a key.');
+    const k=combo(e),owner=usedBy(k,capturing);
+    if(owner)return hkMsg(pretty(k)+' is already used for "'+owner+'". Press a different key.');
+    setBinding(capturing,k);capturing=null;hkMsg('');save();render();renderHk();
+    return;
+  }
+  if($('#hk').open||e.metaKey||e.ctrlKey||e.altKey)return;
+  const t=e.target;
+  if(t.tagName==='TEXTAREA'||t.tagName==='SELECT'||(t.tagName==='INPUT'&&!/range|checkbox|file/.test(t.type)))return;
+  const k=combo(e),hit=allBinds().find(b=>b.key&&b.key===k);
+  if(hit){e.preventDefault();hit.run()}
+});
+
+/* Settings */
+$('#gname').value=S.game.name||'';$('#gdate').value=S.game.date||'';
+$('#pre').value=S.pre;$('#post').value=S.post;$('#roster').value=S.roster.join('\n');
+$('#url').value=S.game.videoId?'https://www.youtube.com/watch?v='+S.game.videoId:'';
+$('#gname').oninput=e=>{S.game.name=e.target.value.trim();save()};
+$('#gdate').onchange=e=>{S.game.date=e.target.value;save()};
+function freshGame(){S.game={id:newId(),name:'',date:today(),videoId:S.game.videoId};S.clips=[];sel=null;$('#gname').value='';$('#gdate').value=S.game.date}
+$('#newgame').onclick=()=>{
+  if(S.clips.length&&!confirm('Start a new game? This clears the current clips, so download the JSON first. The video stays loaded.'))return;
+  freshGame();save();render();toast('New game started');
+};
+$('#pre').onchange=e=>{S.pre=Math.max(0,+e.target.value||0);save()};
+$('#post').onchange=e=>{S.post=Math.max(0,+e.target.value||0);save()};
+$('#roster').onchange=e=>{S.roster=e.target.value.split('\n').map(s=>s.trim()).filter(Boolean);save();render()};
+const applySize=()=>document.documentElement.style.setProperty('--pct',S.size+'%');
+$('#size').value=S.size;applySize();
+$('#size').oninput=e=>{S.size=+e.target.value;applySize()};
+$('#size').onchange=e=>{save();e.target.blur()};
+
+/* Import / export */
+function out(){
+  sortClips();
+  return{version:3,
+    game:{id:S.game.id,name:S.game.name,date:S.game.date,videoId:S.game.videoId},
+    roster:S.roster,
+    clips:S.clips.map(({id,start,end,players,action,note})=>({id,start,end,players,action,note}))};
+}
+const slug=t=>t.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+const fileName=()=>[S.game.date,slug(S.game.name||'')||S.game.id].filter(Boolean).join('-')+'.json';
+$('#dl').onclick=()=>{
+  if(!S.game.name&&!confirm('This game has no name yet, and the team page shows it. Download anyway?'))return;
+  const b=new Blob([JSON.stringify(out(),null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download=fileName();a.click();renderList();
+};
+$('#cp').onclick=async()=>{
+  try{await navigator.clipboard.writeText(JSON.stringify(out(),null,2));toast('Copied JSON');renderList()}
+  catch(e){alert('Copy was blocked by the browser. Use Download JSON instead.')}
+};
+$('#imp').onclick=()=>$('#file').click();
+$('#file').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const d=JSON.parse(await f.text());if(!Array.isArray(d.clips))throw 0;
+    if(S.clips.length&&!confirm('Importing replaces the game you are working on. Download its JSON first if you need it. Continue?')){e.target.value='';return}
+    const g=d.game||{},m=d.match||{};
+    S.game={id:g.id||newId(),name:g.name||m.title||'',date:g.date||m.date||'',videoId:g.videoId||m.videoId||''};
+    if(Array.isArray(d.roster)&&d.roster.length)S.roster=d.roster;
+    S.clips=d.clips.map(c=>{const p=Array.isArray(c.players)?c.players:(c.player?[c.player]:[]);const{player,...r}=c;return{...r,players:p}});sel=null;save();render();
+    $('#gname').value=S.game.name||'';$('#gdate').value=S.game.date||'';$('#roster').value=S.roster.join('\n');
+    $('#url').value=S.game.videoId?'https://www.youtube.com/watch?v='+S.game.videoId:'';
+    if(apiReady&&S.game.videoId)mount(S.game.videoId);
+  }catch(_){alert('That file is not a clip export from this tool.')}
+  e.target.value='';
+};
+render();
+// Use the team roster from the team data folder until a roster is set here
+fetch('../../team/team.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(t=>{if(t&&Array.isArray(t.roster)&&t.roster.length&&S.roster.every((n,i)=>n==='Player '+(i+1))){S.roster=t.roster.map(String);save();$('#roster').value=S.roster.join('\n');render()}}).catch(()=>{});
+</script>
+</body>
+</html>
