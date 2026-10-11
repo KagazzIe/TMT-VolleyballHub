@@ -31,15 +31,6 @@ Your site updates about two minutes later. To watch, open the **Actions** tab: a
 it's working, a green check means it's done. If the page still looks old, refresh it with
 **Ctrl+F5** (Windows) or **Cmd+Shift+R** (Mac).
 
-## Trying the newest version of the hub
-
-Your site uses the stable version of the hub. To preview the newest one:
-
-1. Open the **Actions** tab and click **Deploy team hub** on the left.
-2. Click **Run workflow**, choose **main** under *Hub version*, and click the green **Run workflow** button.
-
-Your next upload switches back to the stable version on its own.
-
 ## If something goes wrong
 
 - **Red X in the Actions tab:** click it to see which step failed. The most common cause is the

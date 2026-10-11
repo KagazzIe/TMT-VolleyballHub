@@ -59,11 +59,6 @@ repository (**Add file → Upload files → Commit changes**). The site updates 
 You can try the rotation editor and Clip Marker on the [demo site](https://kagazzie.github.io/TMT-VolleyballHub/)
 first. Nothing changes on any team's site until a file is uploaded.
 
-**Trying the newest version:** your site uses the stable version of the hub. To preview the newest one,
-open **Actions → Deploy team hub → Run workflow**, choose **main** as the hub version, and click
-**Run workflow**. Your next upload switches back. To stay on the newest version, add an Actions
-variable `HUB_VERSION` = `main`.
-
 ## How it works (for developers)
 This repo holds **code only**. Each team has its **own repo** with its data and one small workflow file:
 
@@ -76,7 +71,7 @@ your-team-repo/
 ```
 
 Each deploy combines this repo's code with the team's files and publishes to the team's own
-GitHub Pages at the team's own URL. Teams run the hub version they choose (`@v1` or `@main`),
+GitHub Pages at the team's own URL. Team sites use the stable release (`@v1`),
 so updates reach them on their next deploy without copying any code. The team repo is public
 (free GitHub Pages needs that). Nothing in the hub links to team sites. Pushing to a team repo
 redeploys it, and it also redeploys every Monday to pick up hub updates (GitHub pauses scheduled
@@ -111,9 +106,8 @@ Design and data rules for new pages are in [`AGENTS.md`](AGENTS.md).
 - Repo rules live in `.github/rulesets/`: `main` needs a reviewed pull request with passing Page checks,
   and only admins can create, move or delete `v*` tags. Import them under
   **Settings → Rules → Rulesets → New ruleset → Import a ruleset**. Admins can bypass both.
-- To test a change on the team site before releasing it, run the team's deploy with **Hub version: main**.
 - This repo's own site is a demo with no team data. It uses the shared workflow from the current
-  commit, so pushing to `main` shows exactly what `@main` teams will get.
+  commit, so pushing to `main` shows the latest code there before you release it to teams.
 - The Team of Misfit Toys runs as a normal team from its own repo.
 - When `main` is stable, move the `v1` tag so `@v1` teams get the update:
   ```

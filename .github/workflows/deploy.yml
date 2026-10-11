@@ -33,7 +33,7 @@ jobs:
       TEAM_DATA_REPO: ${{ inputs.team_data_repo || github.repository }}
     steps:
       # Use the hub code from the same commit as this workflow file, so a team
-      # on @v1 gets v1 code and a team on @main gets the latest.
+      # on @v1 gets v1 code, and the demo (which runs this file directly) gets its own commit.
       - name: Find which hub version is running
         id: hub
         run: |
