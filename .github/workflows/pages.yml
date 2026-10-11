@@ -1,7 +1,8 @@
 name: Deploy site
 
-# This repo's own site runs the shared workflow exactly like a team's site does,
-# except it uses the workflow from this commit instead of a release tag.
+# Demo site for the hub. It runs the shared workflow like a team's site does, but
+# from this commit instead of a release tag, and with no TEAM_DATA_TOKEN secret,
+# so it publishes the pages with no team data.
 
 on:
   push:

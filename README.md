@@ -1,7 +1,7 @@
 # TMT: Volleyball Hub
 
 A small site for a 5-1 volleyball team: a rotation guide, a match clip viewer, and a clip-tagging tool.
-Live for the Team of Misfit Toys at https://kagazzie.github.io/TMT-VolleyballHub/
+Demo (no team data): https://kagazzie.github.io/TMT-VolleyballHub/
 
 | Page | Path |
 |---|---|
@@ -54,8 +54,9 @@ commits for 60 days; data uploads still redeploy with the latest hub, and you ca
 schedule from the Actions tab.
 
 ## Maintaining the hub (KagazzIe)
-- This repo's own site uses the shared workflow from the current commit, so pushing to `main`
-  redeploys it with exactly what `@main` teams will get.
+- This repo's own site is a demo with no team data (no `TEAM_DATA_TOKEN` secret here). It uses the
+  shared workflow from the current commit, so pushing to `main` shows exactly what `@main` teams will get.
+- The Team of Misfit Toys runs as a normal team from its own site and data repos.
 - When `main` is stable, move the `v1` tag so `@v1` teams get the update:
   ```
   git tag -f v1
