@@ -35,8 +35,18 @@ see its data. Nothing in the hub links to team sites.
 4. **Settings → Pages → Source: GitHub Actions.**
 5. **Actions → Deploy team hub → Run workflow.**
 
-After that, upload game JSONs to `clips/` and replace `rotations.json` when you export new positions.
-Each upload redeploys the site. It also redeploys every Monday to pick up hub updates (GitHub pauses
+After that, each upload to the repo redeploys the site.
+
+### Updating your data from the browser
+You can try all of this on the demo site first. Edits stay in your browser until you publish them.
+
+- **Rotations:** open the rotation guide → **Edit positions**. For each rotation and view you can drag players,
+  choose who the libero replaces, add highlights (like "S behind OH1") and write a note.
+  Then **Export JSON → Download rotations.json**.
+- **Games:** tag a match in Clip Marker and export the game JSON.
+- **Publish:** in your team repo on GitHub, **Add file → Upload files**, drop in `rotations.json`
+  (replacing the old one) or the game file inside `clips/`, then **Commit changes**.
+  The site updates in a minute or two. It also redeploys every Monday to pick up hub updates (GitHub pauses
 scheduled runs in repos with no commits for 60 days; re-enable from the Actions tab).
 
 ### Optional: keep data in a separate private repo
