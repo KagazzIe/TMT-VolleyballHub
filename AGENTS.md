@@ -15,6 +15,12 @@ team's own repo and is copied to `team/` at deploy time by `.github/workflows/de
   `version`, keep reading older versions, and never require teams to re-export.
 - Teams run `@v1` of the shared workflow. Only move the `v1` tag once `main` is tested.
 
+## Browser storage
+A demo site and team sites can share one origin (`user.github.io/a/`, `user.github.io/b/`), and
+`localStorage` is per origin. Key anything site-specific (drafts, tool state) by the site's base path,
+for example `'name@' + new URL('../', location.href).pathname` from a page one folder deep.
+Pure viewer preferences (playback speed, video size) may stay unscoped.
+
 ## Pages
 | Path | File | Notes |
 |---|---|---|

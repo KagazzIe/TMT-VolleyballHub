@@ -131,7 +131,11 @@ svg.editing{touch-action:none}svg.editing .p{cursor:grab}textarea{width:100%;fon
 </aside>
 <script>
 // Team positions are loaded from the team data folder; nothing team-specific lives in this file.
-const TEAM_URL='../team/rotations.json',LS='tmt-rotations-draft-v2',LS_OLD='rotguide-edits-v1';
+// Several hub sites can share one browser origin (e.g. user.github.io/demo and user.github.io/team),
+// so saved drafts are keyed by the site's base path.
+const SITE=new URL('../',location.href).pathname;
+const TEAM_URL='../team/rotations.json',LS='tmt-rotations-draft-v2@'+SITE;
+try{localStorage.removeItem('tmt-rotations-draft-v2');localStorage.removeItem('rotguide-edits-v1')}catch(e){}  // old unscoped keys
 const R=['S','OH1','MB1','OPP','OH2','MB2'];
 const START={S:1,OH1:2,MB2:3,OPP:4,OH2:5,MB1:6};
 const SX={4:70,3:150,2:230,5:70,6:150,1:230};
@@ -314,15 +318,6 @@ function readFile(d){
 }
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}};
 const lsSet=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
-// Edits saved by the oldest version of this page: keep receive, serve and base positions
-function oldDraft(){
-  const o=lsGet(LS_OLD);if(!o||!o._t)return null;const v={};
-  for(const[k,p]of Object.entries(o)){
-    if(/^(rx|sv)\|/.test(k))v[k]=p;
-    const m=k.match(/^df\|(\d)\|(\w+)\|base$/);if(m)v[`bs|${m[1]}|${m[2]}`]=p;
-  }
-  return readFile({format:'tmt-rotations',updated:o._t,views:v});
-}
 function saveDraft(){draft=true;lsSet(LS,{format:'tmt-rotations',version:2,updated:Date.now(),views:EDITS})}
 // Change one field of a view's record; empty records are dropped
 function setRec(k,fn){
@@ -336,7 +331,7 @@ async function loadTeam(){
   let st='missing',f=null;
   try{const r=await fetch(TEAM_URL,{cache:'no-cache'});if(r.ok){st='invalid';f=readFile(await r.json());if(f)st='loaded'}}catch(e){}
   teamState=st;TEAM=f?f.views:{};TEAM_T=f?f.t:0;
-  const d=readFile(lsGet(LS))||oldDraft();
+  const d=readFile(lsGet(LS));
   if(d&&d.t>TEAM_T){EDITS=deep(d.views);draft=true}else{EDITS=deep(TEAM);draft=false}
   render();
 }
@@ -350,7 +345,7 @@ function moveTo(r,x,y){
 }
 function commit(){setRec(stateKey(),r=>{r.pos=clone(CUR)});updateUI(CUR)}
 function resetView(){const k=stateKey();if(k&&EDITS[k]){delete EDITS[k];saveDraft()}render()}
-function revert(){EDITS=deep(TEAM);draft=false;lsSet(LS,null);lsSet(LS_OLD,null);render()}
+function revert(){EDITS=deep(TEAM);draft=false;lsSet(LS,null);render()}
 // Drawing
 const svg=document.getElementById('court');
 let h='<defs><clipPath id="cc"><rect x="20" y="20" width="260" height="310"/></clipPath><filter id="bl" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="2.5"/></filter></defs>';

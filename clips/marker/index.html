@@ -127,7 +127,9 @@ const DEFAULT_PKEYS=['1','2','3','4','!','@','#'];
 function newId(){return(Math.random().toString(36)+'00000000').slice(2,10)}
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 const RATES=[0.25,0.5,0.75,1,1.25,1.5,2];
-const KEY='clipmarker:v1';
+// Keyed by the site's base path so a demo site and a team site on the same origin keep separate state
+const KEY='clipmarker:v1@'+new URL('../../',location.href).pathname;
+try{const old=localStorage.getItem('clipmarker:v1');if(old&&!localStorage.getItem(KEY))localStorage.setItem(KEY,old);localStorage.removeItem('clipmarker:v1')}catch(e){}
 const $=s=>document.querySelector(s);
 let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 const SAVED=S;
