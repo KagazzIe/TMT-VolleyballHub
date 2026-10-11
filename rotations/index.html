@@ -136,8 +136,6 @@ const TEAM_URL='../team/rotations.json',LS='tmt-rotations-draft-v2',LS_OLD='rotg
 const R=['S','OH1','MB1','OPP','OH2','MB2'];
 const START={S:1,OH1:2,MB2:3,OPP:4,OH2:5,MB1:6};
 const SX={4:70,3:150,2:230,5:70,6:150,1:230};
-// Default libero swap: the back-row middle, or the back-row outside when that middle is serving
-const SUB=['MB1','MB1','OH1','MB2','MB2','OH2'];
 const front=s=>s===2||s===3||s===4;
 const nxt=s=>s===1?6:s-1;
 const kind=r=>r.replace(/\d/,'');
@@ -151,10 +149,18 @@ function stateKey(){
   return view==='receive'?`rx|${rot}`:view==='serving'?`sv|${rot}|${lib}`:`bs|${rot}|${lib}`;
 }
 const rec=()=>{const k=stateKey();return(k&&EDITS[k])||{}};
-const backRow=()=>R.filter(r=>r!=='S'&&!front(slot(r,rot)));
+// Players the libero may replace: back row, not the setter, and not the server while we serve
+const backRow=()=>R.filter(r=>r!=='S'&&!front(slot(r,rot))&&!(view==='serving'&&slot(r,rot)===1));
+// Default: the libero replaces the back-row middle, and is out while that middle serves
+function defaultLibero(){
+  const mb=['MB1','MB2'].find(r=>!front(slot(r,rot)));
+  return view==='serving'&&slot(mb,rot)===1?null:mb;
+}
 function liberoFor(){
   if(pos!==1||lib==='off')return null;
-  const l=rec().libero;return l&&backRow().includes(l)?l:SUB[rot];
+  const l=rec().libero;
+  if(l==='none')return null;
+  return l&&backRow().includes(l)?l:defaultLibero();
 }
 const isL=r=>liberoFor()===r;
 const ZR={LB:[100,100],MID:[125,85],RB:[100,100]};
@@ -206,8 +212,9 @@ function spot(r){
   const s=slot(r,rot),k=isL(r)?'L':kind(r);
   if(front(s))return k==='OH'?'LF':k==='MB'?'MF':'RF';
   if(k==='S'||k==='OPP')return 'RB';
-  if(lib==='mid')return k==='L'?'MID':'LB';
-  if(lib==='left')return k==='L'?'LB':'MID';
+  const lm=liberoFor()?lib:'off';
+  if(lm==='mid')return k==='L'?'MID':'LB';
+  if(lm==='left')return k==='L'?'LB':'MID';
   return k==='OH'?'LB':'MID';
 }
 const sBack=()=>!front(slot('S',rot));
@@ -283,7 +290,7 @@ const okNote=s=>typeof s==='string'&&s.trim()?s.trim().slice(0,800):'';
 function cleanRec(v){
   const o={};if(!v||typeof v!=='object')return o;
   if(okPos(v.pos))o.pos=clone(v.pos);
-  if(typeof v.libero==='string'&&v.libero!=='S'&&R.includes(v.libero))o.libero=v.libero;
+  if(v.libero==='none'||(typeof v.libero==='string'&&v.libero!=='S'&&R.includes(v.libero)))o.libero=v.libero;
   if(Array.isArray(v.highlights)){
     const h=v.highlights.filter(x=>Array.isArray(x)&&x.length===3&&Number.isInteger(x[0])&&Number.isInteger(x[1])&&x[0]>=1&&x[0]<=6&&x[1]>=1&&x[1]<=6&&x[0]!==x[1]&&REL.includes(x[2])).map(x=>[x[0],x[1],x[2]]);
     if(h.length)o.highlights=h;
@@ -411,8 +418,9 @@ function updatePanel(){
   // Libero
   $('libSec').hidden=lib==='off';
   if(lib!=='off'){
-    fillSelect($('libSel'),backRow().map(p=>[p,p+(p===SUB[rot]?' (default)':'')]));
-    $('libSel').value=liberoFor();
+    const d=defaultLibero()||'none';
+    fillSelect($('libSel'),[...backRow().map(p=>[p,p]),['none','Nobody (libero is out)']].map(([v,l])=>[v,l+(v===d?' (default)':'')]));
+    $('libSel').value=liberoFor()||'none';
   }
   // Highlights
   const H=r.highlights||[];
@@ -430,7 +438,8 @@ function updatePanel(){
 function updateUI(P){
   const $=id=>document.getElementById(id),s=slot('S',rot),on=(sel,fn)=>document.querySelectorAll(sel).forEach(b=>b.setAttribute('aria-pressed',fn(b)));
   const L=liberoFor();
-  $('head').innerHTML=`<b>Rotation ${rot+1}:</b> setter starts in position ${s} (${front(s)?'front':'back'} row).`+(L?` Libero replaces ${L}.`:'');
+  const out=pos===1&&lib!=='off'&&!L,srv=R.find(q=>slot(q,rot)===1);
+  $('head').innerHTML=`<b>Rotation ${rot+1}:</b> setter starts in position ${s} (${front(s)?'front':'back'} row).`+(L?` Libero replaces ${L}.`:out?(view==='serving'&&!rec().libero?` The libero is out while ${srv} serves.`:' The libero is out.'):'');
   let t;const r=rec(),own=r.pos,note=r.note;
   const dflt=' These are default positions in plain rotation order. Use Edit positions to set your own.';
   if(pos!==1)t='Plain rotation order with no positional play. Everyone stands where the rotation puts them. Compare this with 5-1 positioning.';
@@ -472,7 +481,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&edit){edit=false;re
 $('resetPos').onclick=()=>{setRec(stateKey(),r=>{delete r.pos});render()};
 $('resetView').onclick=()=>{confirmRevert=false;resetView()};
 $('revert').onclick=()=>{if(confirmRevert){confirmRevert=false;revert()}else{confirmRevert=true;updateUI()}};
-$('libSel').onchange=e=>{const v=e.target.value;setRec(stateKey(),r=>{if(v===SUB[rot])delete r.libero;else r.libero=v});render()};
+$('libSel').onchange=e=>{const v=e.target.value;setRec(stateKey(),r=>{if(v===(defaultLibero()||'none'))delete r.libero;else r.libero=v});render()};
 $('hlAdd').onclick=()=>{
   const a=+$('hlA').value,b=+$('hlB').value,rel=$('hlRel').value;
   if(a===b){$('warn').textContent='Pick two different players for a highlight.';return}
