@@ -1,6 +1,7 @@
 # TMT: Volleyball Hub
 
-A small site for a 5-1 volleyball team: a rotation guide, a match clip viewer, and a clip-tagging tool. Live at https://kagazzie.github.io/TMT-VolleyballHub/
+A small site for a 5-1 volleyball team: a rotation guide, a match clip viewer, and a clip-tagging tool.
+Live for the Team of Misfit Toys at https://kagazzie.github.io/TMT-VolleyballHub/
 
 | Page | Path |
 |---|---|
@@ -9,34 +10,61 @@ A small site for a 5-1 volleyball team: a rotation guide, a match clip viewer, a
 | Match Clips viewer | `/clips/` |
 | Clip Marker | `/clips/marker/` |
 
-## Team data stays out of this repo
-This repo holds code only. Everything about a specific team lives in a separate **private** repo
-(by default `<this repo>-data`) laid out like this:
+## How it fits together
+This repo holds **code only**. Each team has:
+
+- a **private data repo** with its clips, rotation positions and roster, and
+- a **public site repo** whose only file is a small workflow that calls this repo's shared
+  workflow ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)).
+
+Each deploy combines this repo's code with the team's data and publishes it to the team's own
+GitHub Pages at the team's own URL. Teams always run the hub version they ask for (`@v1` or `@main`),
+so updates reach them on their next deploy without copying any code.
+
+Data repo layout:
 
 ```
 team.json          {"name": "...", "roster": ["...", "..."]}
-rotations.json     exported from the rotation guide's Export JSON button
+rotations.json     exported from the rotation guide (Edit positions → Export JSON)
 clips/*.json       one file per game, exported from Clip Marker
 ```
 
-The deploy workflow copies that repo into `team/` and publishes it with the site.
-Pushing to the data repo triggers a redeploy (see its workflow).
-Once deployed, those files are reachable by anyone with the site URL; the private repo keeps them out of public code and history.
+Once deployed, the data files are reachable by anyone with the site URL. The private repo keeps
+them out of public code and history.
 
-### One-time setup
-1. Create the private data repo.
-2. Create a fine-grained personal access token with **Contents: Read and write** on both repos.
-3. Add it as an Actions secret named `TEAM_DATA_TOKEN` in **both** repos.
-4. In this repo: Settings → Pages → Source: **GitHub Actions**.
+## Set up your own team
+1. **Create two repos** under your account:
+   - a **public** site repo, for example `volleyball-hub`. Your site will be at `https://<you>.github.io/volleyball-hub/`.
+   - a **private** data repo with the same name plus `-data`, for example `volleyball-hub-data`.
+     (Other names work too: set an Actions variable `TEAM_DATA_REPO` = `owner/name` in the site repo.)
+2. **Site repo:** add [`starter/team-site/deploy.yml`](starter/team-site/deploy.yml) as `.github/workflows/deploy.yml`.
+3. **Data repo:** add [`starter/team-data/redeploy-site.yml`](starter/team-data/redeploy-site.yml) as
+   `.github/workflows/redeploy-site.yml`, and [`starter/team-data/team.json`](starter/team-data/team.json)
+   with your team name and roster.
+4. **Token:** GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens →
+   Generate new token. Only select repositories: both of yours. Repository permissions → **Contents: Read and write**.
+5. **Secrets:** in **both** repos, Settings → Secrets and variables → Actions → New repository secret,
+   name `TEAM_DATA_TOKEN`, value = the token.
+6. **Pages:** in the site repo, Settings → Pages → Source: **GitHub Actions**.
+7. In the site repo, Actions → Deploy team hub → **Run workflow**.
 
-### Day to day
-- **New game:** export from Clip Marker, upload to `clips/` in the data repo.
-- **Rotation changes:** Edit positions → Export JSON, upload as `rotations.json` in the data repo.
+After that, upload game JSONs to `clips/` and `rotations.json` to the data repo; the site redeploys on its own.
+It also redeploys every Monday to pick up hub updates. GitHub pauses scheduled runs in repos with no
+commits for 60 days; data uploads still redeploy with the latest hub, and you can re-enable the
+schedule from the Actions tab.
 
-### Testing locally
-Copy the data repo's contents into a `team/` folder here (it's gitignored), then run
-`python -m http.server` and open http://localhost:8000/. Create `team/clips/index.json` listing the game files, e.g. `["2026-10-09-game-1.json"]`.
+## Maintaining the hub (KagazzIe)
+- This repo's own site uses the shared workflow from the current commit, so pushing to `main`
+  redeploys it with exactly what `@main` teams will get.
+- When `main` is stable, move the `v1` tag so `@v1` teams get the update:
+  ```
+  git tag -f v1
+  git push -f origin v1
+  ```
+- Keep data files backward compatible. If a change would break existing team files, convert old
+  files when loading them, or start `v2` and leave `v1` alone.
 
-## Using this for your own team
-Fork or copy this repo, create your own `<repo>-data` private repo, and follow the setup above.
-Without a `TEAM_DATA_TOKEN` secret the site still deploys, just with no team data, and pages fall back to defaults.
+## Testing locally
+Copy a data repo's contents into a `team/` folder here (it's gitignored), create
+`team/clips/index.json` listing the game files (e.g. `["2026-10-09-game-1.json"]`), then run
+`python -m http.server` and open http://localhost:8000/.
