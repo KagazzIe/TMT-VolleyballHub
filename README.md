@@ -9,53 +9,84 @@ Demo (no team data): https://kagazzie.github.io/TMT-VolleyballHub/
 | 5-1 Rotation Guide | `/rotations/` |
 | Match Clips viewer | `/clips/` |
 | Clip Marker | `/clips/marker/` |
+| Team Setup | `/setup/` |
 
-## How it fits together
+## Set up your own team
+
+About 10 minutes. No coding or downloads needed, just a web browser and a free GitHub account.
+GitHub hosts your team's site for free.
+
+### 1. Copy the team template
+1. Sign in to [GitHub](https://github.com), or [create a free account](https://github.com/signup).
+2. Open the [team template](https://github.com/KagazzIe/TMT-VolleyballHub-team-template) and click the
+   green **Use this template** button, then **Create a new repository**.
+3. Give it a short name, like `volleyball`. It becomes part of your site's address.
+4. Choose **Public**, then click **Create repository**.
+
+### 2. Turn on your website
+1. In your new repository, click **Settings** (along the top), then **Pages** (on the left).
+2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
+
+### 3. Add your team name and players
+1. Open the hub's [Team Setup page](https://kagazzie.github.io/TMT-VolleyballHub/setup/), fill it in,
+   and click **Download team.json**.
+2. Back in your repository, click the **Code** tab, then **Add file → Upload files**.
+3. Drag in `team.json` and click **Commit changes**.
+
+That upload also builds your site for the first time.
+
+### 4. Open your site
+1. Click the **Actions** tab. After about two minutes you'll see a green check.
+2. Go to **Settings → Pages**. It shows **Your site is live at** and a link, which will be something like
+   `https://your-name.github.io/volleyball/`. Bookmark it and share it with your team.
+
+Your repository's front page has the rest: how to add matches and rotations, and what to do if
+something goes wrong.
+
+**Good to know:** your site and repository are public. Anyone with the link can see them, but nothing
+on this hub links to your team.
+
+## Updating your team's data
+Every change works the same way: make it on your hub site, download the file, and upload it to your
+repository (**Add file → Upload files → Commit changes**). The site updates about two minutes later.
+
+| To change | Use | Upload |
+|---|---|---|
+| Team name or players | **Team Setup** | `team.json` |
+| Rotation positions, highlights and notes | **5-1 Rotation Guide → Edit positions → Export JSON** | `rotations.json` |
+| Add a match | **Clip Marker → Download JSON** | the game file, into the `clips` folder |
+
+You can try the rotation editor and Clip Marker on the [demo site](https://kagazzie.github.io/TMT-VolleyballHub/)
+first. Nothing changes on any team's site until a file is uploaded.
+
+**Trying the newest version:** your site uses the stable version of the hub. To preview the newest one,
+open **Actions → Deploy team hub → Run workflow**, choose **main** as the hub version, and click
+**Run workflow**. Your next upload switches back. To stay on the newest version, add an Actions
+variable `HUB_VERSION` = `main`.
+
+## How it works (for developers)
 This repo holds **code only**. Each team has its **own repo** with its data and one small workflow file:
 
 ```
 your-team-repo/
-  .github/workflows/deploy.yml   copied from starter/deploy.yml
+  .github/workflows/deploy.yml   from the team template (source: starter/deploy.yml)
   team.json                      {"name": "...", "roster": ["...", "..."]}
-  rotations.json                 exported from the rotation guide (Edit positions → Export JSON)
+  rotations.json                 exported from the rotation guide
   clips/*.json                   one file per game, exported from Clip Marker
 ```
 
 Each deploy combines this repo's code with the team's files and publishes to the team's own
 GitHub Pages at the team's own URL. Teams run the hub version they choose (`@v1` or `@main`),
-so updates reach them on their next deploy without copying any code.
+so updates reach them on their next deploy without copying any code. The team repo is public
+(free GitHub Pages needs that). Nothing in the hub links to team sites. Pushing to a team repo
+redeploys it, and it also redeploys every Monday to pick up hub updates (GitHub pauses scheduled
+runs in repos with no commits for 60 days).
 
-The team repo must be public for free GitHub Pages, so anyone who finds the team's repo or site can
-see its data. Nothing in the hub links to team sites.
+The team template repo is a copy of `starter/`. When `starter/` changes, copy it there too.
 
-## Set up your own team
-1. **Create a public repo**, for example `volleyball`. Your site will be at `https://<you>.github.io/volleyball/`.
-2. Add [`starter/deploy.yml`](starter/deploy.yml) as `.github/workflows/deploy.yml`.
-3. Add [`starter/team.json`](starter/team.json) with your team name and roster.
-4. **Settings → Pages → Source: GitHub Actions.**
-5. **Actions → Deploy team hub → Run workflow.**
-
-After that, each upload to the repo redeploys the site.
-
-**Trying the newest hub version:** your site runs the stable `v1` release. To preview the latest
-changes, go to **Actions → Deploy team hub → Run workflow** and pick **Hub version: main**.
-The next normal deploy switches back. To stay on `main`, add an Actions variable `HUB_VERSION` = `main`.
-
-### Updating your data from the browser
-You can try all of this on the demo site first. Edits stay in your browser until you publish them.
-
-- **Rotations:** open the rotation guide → **Edit positions**. For each rotation and view you can drag players,
-  choose who the libero replaces, add highlights (like "S behind OH1") and write a note.
-  Then **Export JSON → Download rotations.json**.
-- **Games:** tag a match in Clip Marker and export the game JSON.
-- **Publish:** in your team repo on GitHub, **Add file → Upload files**, drop in `rotations.json`
-  (replacing the old one) or the game file inside `clips/`, then **Commit changes**.
-  The site updates in a minute or two. It also redeploys every Monday to pick up hub updates (GitHub pauses
-scheduled runs in repos with no commits for 60 days; re-enable from the Actions tab).
-
-### Optional: keep data in a separate private repo
+### Optional: keep data in a separate private repo (advanced)
 This keeps the data off GitHub's repo pages, though the deployed site still serves it.
-1. Create a private data repo with the files above, plus
+1. Create a private data repo with the data files above, plus
    [`starter/private-data/redeploy-site.yml`](starter/private-data/redeploy-site.yml) as `.github/workflows/redeploy-site.yml`.
    Name it `<site repo>-data`, or set an Actions variable `SITE_REPO` = `owner/name` in it.
 2. In the site repo, set an Actions variable `TEAM_DATA_REPO` = `owner/data-repo`.

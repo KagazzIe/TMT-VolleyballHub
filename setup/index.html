@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Team Setup · TMT: Volleyball Hub</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/theme.css">
+<style>
+/* Page styles. Colors, fonts and radii come from ../assets/theme.css (see AGENTS.md). */
+main{max-width:560px;margin:0 auto;padding:16px 14px 40px}
+h1{font:700 30px/1 var(--font-display);margin:4px 0 10px}
+.intro{color:var(--muted);margin:0 0 16px}
+.card{background:var(--card);border-radius:var(--r);padding:14px 16px;margin-bottom:12px}
+label{display:block;font:600 13px var(--font);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 6px}
+input,textarea{font:inherit;color:inherit;width:100%;background:var(--bg);border:1px solid var(--edge);border-radius:var(--r-sm);padding:9px 11px}
+textarea{min-height:190px;resize:vertical}
+.hint{color:var(--muted);font-size:14px;margin:6px 0 14px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+button{font:600 15px var(--font);color:var(--ink);background:var(--chip);border:0;border-radius:var(--r-sm);min-height:44px;padding:0 16px;cursor:pointer}
+button:not(:disabled):hover{background:var(--edge)}
+button.pri,button.pri:hover{background:var(--on);color:var(--onink)}
+#msg{color:var(--alert);font-weight:600;min-height:1.4em;margin:8px 0 0}
+#msg.ok{color:var(--ok)}
+ol{margin:6px 0 0;padding-left:22px}ol li{margin:4px 0}
+#loaded{color:var(--muted);font-size:14px;margin:0 0 12px}
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="../">&larr; TMT: Volleyball Hub</a>
+  <h1>Team setup</h1>
+  <p class="intro">Fill this in and download your <b>team.json</b> file. It sets your team's name on the hub and the player list in Clip Marker.</p>
+  <p id="loaded" hidden>Filled in from your team's current file.</p>
+  <div class="card">
+    <label for="tname">Team name</label>
+    <input id="tname" autocomplete="off" placeholder="Team of Misfit Toys">
+    <div class="hint">Shown at the top of your hub.</div>
+    <label for="roster">Players</label>
+    <textarea id="roster" placeholder="One name per line"></textarea>
+    <div class="hint">One name per line, in the order you want them in Clip Marker. The first players get number keys 1, 2, 3 and so on.</div>
+    <div class="row"><button id="dl" class="pri">Download team.json</button><button id="cp">Copy text</button></div>
+    <p id="msg" role="status"></p>
+  </div>
+  <div class="card">
+    <label>Then put it on your site</label>
+    <ol>
+      <li>Open your team's repository on GitHub.</li>
+      <li>Click <b>Add file</b>, then <b>Upload files</b>.</li>
+      <li>Drag in <b>team.json</b>. It replaces the old one if there is one.</li>
+      <li>Click <b>Commit changes</b>. Your site updates in about two minutes.</li>
+    </ol>
+  </div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const names=()=>[...new Set($('roster').value.split('\n').map(s=>s.trim()).filter(Boolean))];
+function build(){
+  const name=$('tname').value.trim();
+  if(!name){$('msg').className='';$('msg').textContent='Add your team name first.';$('tname').focus();return null}
+  return JSON.stringify({name,roster:names()},null,2)+'\n';
+}
+function done(t){$('msg').className='ok';$('msg').textContent=t}
+$('dl').onclick=()=>{
+  const txt=build();if(!txt)return;
+  try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download='team.json';document.body.appendChild(a);a.click();a.remove();done('Downloaded team.json. Now upload it to your team repository (steps below).')}catch(e){$('msg').textContent='Download was blocked. Use Copy text instead.'}
+};
+$('cp').onclick=async()=>{
+  const txt=build();if(!txt)return;
+  try{await navigator.clipboard.writeText(txt);done('Copied. Paste it into a file named team.json.')}catch(e){$('msg').textContent='Copy was blocked by the browser.'}
+};
+// On a team site, start from the current team file
+fetch('../team/team.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null).then(t=>{
+  if(!t)return;
+  if(typeof t.name==='string')$('tname').value=t.name;
+  if(Array.isArray(t.roster))$('roster').value=t.roster.map(String).join('\n');
+  $('loaded').hidden=false;
+});
+</script>
+</body>
+</html>

@@ -53,7 +53,7 @@ async function open(ctx, url, where) {
   return page;
 }
 
-const PAGES = ['', 'rotations/', 'clips/', 'clips/marker/'];
+const PAGES = ['', 'rotations/', 'clips/', 'clips/marker/', 'setup/'];
 for (const colorScheme of ['light', 'dark']) {
   for (const width of [1280, 390]) {
     for (const site of ['demo', 'team']) {
@@ -74,7 +74,7 @@ for (const colorScheme of ['light', 'dark']) {
 }
 
 // Behavior checks (light, desktop)
-const ctx = await browser.newContext();
+const ctx = await browser.newContext({ acceptDownloads: true });
 const check = async (where, url, fn) => { const page = await open(ctx, BASE + url, where); try { await fn(page); } catch (e) { fail(where, e.message); } await page.close(); };
 const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
 
@@ -120,6 +120,22 @@ await check('marker team', '/team/clips/marker/', async p => {
 });
 await check('marker demo', '/demo/clips/marker/', async p => {
   expect((await p.inputValue('#roster')).startsWith('Player 1'), 'demo roster should be generic');
+});
+
+await check('setup team', '/team/setup/', async p => {
+  expect((await p.inputValue('#tname')) === 'Sample Squad', 'should start from the team file');
+  expect((await p.inputValue('#roster')).split('\n').length === 6, 'roster should come from the team file');
+});
+await check('setup demo', '/demo/setup/', async p => {
+  expect((await p.inputValue('#tname')) === '', 'demo should start empty');
+  await p.click('#dl');
+  expect((await p.innerText('#msg')).includes('team name'), 'should ask for a team name');
+  await p.fill('#tname', '  New Team ');
+  await p.fill('#roster', 'Ana\n\n Bo \nAna\nCy');
+  const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#dl')]);
+  expect(dl.suggestedFilename() === 'team.json', 'file should be named team.json');
+  const out = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
+  expect(out.name === 'New Team' && out.roster.join() === 'Ana,Bo,Cy', `unexpected team.json: ${JSON.stringify(out)}`);
 });
 
 // Starter files must stay valid

@@ -14,6 +14,10 @@ team's own repo and is copied to `team/` at deploy time by `.github/workflows/de
 - Keep `rotations.json` and game JSON backward compatible. If a format changes, bump its
   `version`, keep reading older versions, and never require teams to re-export.
 - Teams run `@v1` of the shared workflow. Only move the `v1` tag once `main` is tested.
+- `starter/` is the content of the public team template repo (KagazzIe/TMT-VolleyballHub-team-template).
+  Keep the two in sync, and keep its README readable by non-technical captains.
+- Team captains are often not technical. Every data change should be "download a file from the hub,
+  upload it on GitHub": never ask them to hand-edit JSON or create files in `.github/`.
 
 ## Browser storage
 A demo site and team sites can share one origin (`user.github.io/a/`, `user.github.io/b/`), and
@@ -28,6 +32,7 @@ Pure viewer preferences (playback speed, video size) may stay unscoped.
 | `/rotations/` | `rotations/index.html` | 5-1 rotation guide and its editor (exports `rotations.json`). |
 | `/clips/` | `clips/index.html` | Match clip viewer. |
 | `/clips/marker/` | `clips/marker/index.html` | Clip Marker, exports one game JSON. |
+| `/setup/` | `setup/index.html` | Team Setup, a form that downloads `team.json`. |
 
 Each page is one self-contained HTML file with inline CSS and JS, plus the shared stylesheet.
 
