@@ -85,28 +85,9 @@ const nxt=s=>s===1?6:s-1;
 const kind=r=>r.replace(/\d/,'');
 const M=30,V=14;
 let pos=1,view='receive',rot=0,lib='left',edit=false,CUR={},tweenId=0,drag=null,confirmRevert=false;
-let TEAM={},TEAM_T=0,teamState='loading',EDITS={},draft=false;
+let TEAM={},TEAM_T=0,TEAM_NOTES={},NOTES={},teamState='loading',EDITS={},draft=false;
 const slot=(r,n)=>{let s=START[r];for(let i=0;i<n;i++)s=nxt(s);return s};
 const isL=r=>pos===1&&lib!=='off'&&SUB[rot]===r;
-// Generic 5-1 serve-receive formations (defaults when the team file has no edit for a view)
-const RECV=[
- {OPP:[68,224],MB2:[152,66],OH1:[178,36],OH2:[149,225],MB1:[231,224],S:[265,98]},
- {OH2:[71,196],OPP:[197,72],MB2:[230,69],MB1:[153,223],S:[215,102],OH1:[250,222]},
- {MB1:[35,72],S:[116,95],OH2:[73,214],OH1:[150,240],OPP:[238,72],MB2:[230,240]},
- {S:[143,38],MB1:[150,72],OH2:[157,107],OH1:[70,240],MB2:[150,240],OPP:[230,240]},
- {OH1:[42,56],S:[222,46],MB1:[245,75],MB2:[70,240],OPP:[150,240],OH2:[230,240]},
- {MB2:[75,40],OPP:[70,240],OH1:[92,73],OH2:[150,240],MB1:[230,240],S:[238,72]}
-];
-const NOTES=[
- 'OPP, OH2 and L pass in a line. MB2 and OH1 wait at the net, and the setter tucks in behind OH1.',
- 'OH2, L and OH1 pass. OPP and MB2 wait at the net, and the setter hides behind OPP.',
- 'OH2 (zone 5), L and MB2 pass. MB1 and OPP wait at the net, and the setter hides at the net, left of L.',
- 'OH1, L and OPP pass in a line. The setter, MB1 and OH2 stack at the center of the net so they reach base quickly.',
- 'L, OPP and OH2 pass in a line. OH1 waits at the net on the left, and the setter and MB1 wait at the net on the right.',
- 'OPP, L and MB1 pass in a line. MB2 and OH1 wait at the net on the left, and the setter waits at the net on the right.'
-];
-// Generic base: front row at the net, wings short, middle back deep
-const BASE={LF:[62,48],MF:[150,48],RF:[238,48],LB:[60,170],MID:[150,285],RB:[240,170]};
 const ZR={LB:[100,100],MID:[125,85],RB:[100,100]};
 const ZSCALE=0.82,OVERLAP=0.06;   // zone size multiplier and how far neighboring zones may overlap (fraction of the gap)
 const FRONT=['LF','MF','RF'];
@@ -167,11 +148,6 @@ function spot(r){
   return k==='OH'?'LB':'MID';
 }
 const sBack=()=>!front(slot('S',rot));
-function basePos(r){
-  const sp=spot(r);
-  if(sp==='RB'&&kind(r)==='S')return[255,150];
-  return[...BASE[sp]];
-}
 function zoneOf(r){
   const sp=spot(r);let a,b;
   if(FRONT.includes(sp)){a=58;b=42}else{a=ZR[sp][0];b=ZR[sp][1]}
@@ -220,18 +196,14 @@ function stateKey(){
   if(pos!==1)return null;
   return view==='receive'?`rx|${rot}`:view==='serving'?`sv|${rot}|${lib}`:`bs|${rot}|${lib}`;
 }
-// Base for this rotation and libero setting, from edits if any
-function baseTarget(){
-  const e=EDITS[`bs|${rot}|${lib}`];if(e)return clone(e);
-  const T={};R.forEach(r=>T[r]=basePos(r));return T;
-}
+// Plain rotation order: where the rotation puts everyone, with no positional play
+function plain(){const T={};R.forEach(r=>{const s=slot(r,rot);T[r]=[SX[s],front(s)?80:240]});return T}
+// With no team positions, every view shows plain rotation order. If the team set a base
+// for this rotation, serving starts from it and obeys the overlap rules.
 function defaults(){
-  const T={};
-  if(pos!==1){R.forEach(r=>{const s=slot(r,rot);T[r]=[SX[s],front(s)?80:240]});return T}
-  if(view==='receive')return clone(RECV[rot]);
-  if(view==='base')return baseTarget();
-  // Serving: start from base, then obey the overlap rules; the server goes behind the end line
-  const B=baseTarget();R.forEach(r=>T[r]=slot(r,rot)===1?[235,348]:B[r]);
+  const B=pos===1&&view==='serving'&&EDITS[`bs|${rot}|${lib}`];
+  if(!B)return plain();
+  const T={};R.forEach(r=>T[r]=slot(r,rot)===1?[235,348]:[...B[r]]);
   return solve(T,true);
 }
 function target(){const k=stateKey(),e=k&&EDITS[k];return e?clone(e):defaults()}
@@ -247,7 +219,8 @@ function issues(P){
 const KEY_RX=/^(rx\|[0-5]|(sv|bs)\|[0-5]\|(left|mid|off))$/;
 const okPos=p=>p&&R.every(r=>Array.isArray(p[r])&&p[r].length===2&&p[r].every(Number.isFinite));
 function cleanViews(v){const o={};if(v&&typeof v==='object')for(const[k,p]of Object.entries(v))if(KEY_RX.test(k)&&okPos(p))o[k]=clone(p);return o}
-function readFile(d){return d&&d.format==='tmt-rotations'&&d.views&&typeof d.views==='object'?{t:+d.updated||0,views:cleanViews(d.views)}:null}
+function cleanNotes(n){const o={};if(n&&typeof n==='object')for(const[k,s]of Object.entries(n))if(KEY_RX.test(k)&&typeof s==='string'&&s.trim())o[k]=s.trim().slice(0,800);return o}
+function readFile(d){return d&&d.format==='tmt-rotations'&&d.views&&typeof d.views==='object'?{t:+d.updated||0,views:cleanViews(d.views),notes:cleanNotes(d.notes)}:null}
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}};
 const lsSet=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 // Edits saved by the older version of this page (before team files): keep receive, serve and base views
@@ -257,20 +230,21 @@ function oldDraft(){
     if(/^(rx|sv)\|/.test(k))v[k]=p;
     const m=k.match(/^df\|(\d)\|(\w+)\|base$/);if(m)v[`bs|${m[1]}|${m[2]}`]=p;
   }
-  return{t:o._t,views:cleanViews(v)};
+  return{t:o._t,views:cleanViews(v),notes:{}};
 }
-function saveDraft(){draft=true;lsSet(LS,{format:'tmt-rotations',version:1,updated:Date.now(),views:EDITS})}
+function saveDraft(){draft=true;lsSet(LS,{format:'tmt-rotations',version:1,updated:Date.now(),views:EDITS,notes:NOTES})}
 async function loadTeam(){
   let st='missing',f=null;
   try{const r=await fetch(TEAM_URL,{cache:'no-cache'});if(r.ok){st='invalid';f=readFile(await r.json());if(f)st='loaded'}}catch(e){}
-  teamState=st;TEAM=f?f.views:{};TEAM_T=f?f.t:0;
+  teamState=st;TEAM=f?f.views:{};TEAM_T=f?f.t:0;TEAM_NOTES=f?f.notes:{};
   const d=readFile(lsGet(LS))||oldDraft();
-  if(d&&d.t>TEAM_T){EDITS=deep(d.views);draft=true}else{EDITS=deep(TEAM);draft=false}
+  if(d&&d.t>TEAM_T){EDITS=deep(d.views);NOTES=Object.keys(d.notes).length?d.notes:deep(TEAM_NOTES);draft=true}else{EDITS=deep(TEAM);NOTES=deep(TEAM_NOTES);draft=false}
   render();
 }
 function exportText(){
-  const ks=Object.keys(EDITS).sort();
-  return '{\n  "format": "tmt-rotations",\n  "version": 1,\n  "updated": '+Date.now()+',\n  "views": {'+ks.map(k=>'\n    '+JSON.stringify(k)+': '+JSON.stringify(EDITS[k])).join(',')+'\n  }\n}\n';
+  const ks=Object.keys(EDITS).sort(),ns=Object.keys(NOTES).sort();
+  const notes=ns.length?',\n  "notes": {'+ns.map(k=>'\n    '+JSON.stringify(k)+': '+JSON.stringify(NOTES[k])).join(',')+'\n  }':'';
+  return '{\n  "format": "tmt-rotations",\n  "version": 1,\n  "updated": '+Date.now()+',\n  "views": {'+ks.map(k=>'\n    '+JSON.stringify(k)+': '+JSON.stringify(EDITS[k])).join(',')+'\n  }'+notes+'\n}\n';
 }
 function moveTo(r,x,y){
   CUR[r]=[Math.round(Math.min(286,Math.max(14,x))),Math.round(Math.min(358,Math.max(14,y)))];
@@ -281,7 +255,7 @@ function commit(){
   EDITS[k]=clone(CUR);saveDraft();updateUI(CUR);
 }
 function resetView(){const k=stateKey();if(k&&EDITS[k]){delete EDITS[k];saveDraft()}render()}
-function revert(){EDITS=deep(TEAM);draft=false;lsSet(LS,null);lsSet(LS_OLD,null);render()}
+function revert(){EDITS=deep(TEAM);NOTES=deep(TEAM_NOTES);draft=false;lsSet(LS,null);lsSet(LS_OLD,null);render()}
 // Drawing
 const svg=document.getElementById('court');
 let h='<defs><clipPath id="cc"><rect x="20" y="20" width="260" height="310"/></clipPath><filter id="bl" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="2.5"/></filter></defs>';
@@ -333,11 +307,12 @@ function updateUI(P){
   const $=id=>document.getElementById(id),s=slot('S',rot),on=(sel,fn)=>document.querySelectorAll(sel).forEach(b=>b.setAttribute('aria-pressed',fn(b)));
   const libOn=pos===1&&lib!=='off';
   $('head').innerHTML=`<b>Rotation ${rot+1}:</b> setter starts in position ${s} (${front(s)?'front':'back'} row).`+(libOn?` Libero replaces ${SUB[rot]}.`:'');
-  let t;
+  let t;const vk=stateKey(),own=vk&&EDITS[vk],note=vk&&NOTES[vk];
+  const dflt=' These are default positions in plain rotation order. Use Edit positions to set your own.';
   if(pos!==1)t='Plain rotation order with no positional play. Everyone stands where the rotation puts them. Compare this with 5-1 positioning.';
-  else if(view==='receive')t=NOTES[rot]+(hlRules().length?' Key rules: '+hlText().join(', ')+'.':'');
-  else if(view==='serving')t='Everyone starts as close to their base position as the overlap rules allow. The server stands behind the end line.';
-  else t='Where everyone sets up once the ball crosses the net: front row ready to block, wings short, middle back deep.'+(sBack()?'':' The setter is in the front row, so the opposite plays right back.');
+  else if(view==='receive')t=(note||'Where everyone stands while the other team serves.'+(own?'':dflt))+(hlRules().length?' Key rules: '+hlText().join(', ')+'.':'');
+  else if(view==='serving'){const fromBase=!own&&EDITS[`bs|${rot}|${lib}`];t=note||(own?'Where everyone stands while we serve. The server stands behind the end line.':fromBase?'Everyone starts as close to their base position as the overlap rules allow. The server stands behind the end line.':'Where everyone stands while we serve.'+dflt+' Setting a base position also fills this in.')}
+  else t=(note||'Where everyone sets up once the ball crosses the net. Shaded areas are dig zones.'+(own?'':dflt))+(sBack()?'':' The setter is in the front row, so the opposite plays right back.');
   $('tip').textContent=t;
   on('#rot button',b=>+b.dataset.i===rot);on('#view button',b=>b.dataset.v===view);on('#sys button',b=>+b.dataset.s===pos);
   on('#lib button',b=>b.dataset.l===lib);on('#editBtn',()=>edit);
@@ -386,7 +361,7 @@ $('importFile').onchange=async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
   let d=null;try{d=readFile(JSON.parse(await f.text()))}catch(err){}
   if(!d){$('warn').textContent='That file is not a rotations JSON exported from this page.';return}
-  EDITS=d.views;saveDraft();render();
+  EDITS=d.views;if(Object.keys(d.notes).length)NOTES=d.notes;saveDraft();render();
 };
 function svgPt(e){
   try{const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;return pt.matrixTransform(svg.getScreenCTM().inverse())}
