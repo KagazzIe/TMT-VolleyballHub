@@ -5,20 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>5-1 Rotation Guide · TMT: Volleyball Hub</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/theme.css">
 <style data-guide>
-:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
---bg:#eef1f5;--ink:#14213d;--muted:#55607a;--card:#fff;--court:#e3b06a;--line:#fffdf6;--chip:#dde3ec;--on:#14213d;--onink:#fff;--S:#e63946;--OH:#1d6fdc;--MB:#2a9d5c;--OPP:#f4a300;--L:#7b5cd6}
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1624;--ink:#e8edf6;--muted:#9aa6bf;--card:#18223a;--court:#8a5d26;--line:#f1e8d4;--chip:#26324f;--on:#e8edf6;--onink:#0f1624}}
-:root[data-theme="dark"]{--bg:#0f1624;--ink:#e8edf6;--muted:#9aa6bf;--card:#18223a;--court:#8a5d26;--line:#f1e8d4;--chip:#26324f;--on:#e8edf6;--onink:#0f1624}
+/* Page styles. Shared colors, fonts and radii come from ../assets/theme.css (see AGENTS.md).
+   --court and --line are this page's own court colors. */
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--court:#e3b06a;--line:#fffdf6}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--court:#8a5d26;--line:#f1e8d4}}
+:root[data-theme="dark"]{--court:#8a5d26;--line:#f1e8d4}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
-*,*::before,*::after{box-sizing:inherit}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.45 Barlow,system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:520px;margin:0 auto;padding:16px 14px 28px}
-h1{font:700 30px/1 "Barlow Condensed","Arial Narrow",sans-serif;margin:4px 0 14px;letter-spacing:.2px}
+h1{font:700 30px/1 var(--font-display);margin:4px 0 14px;letter-spacing:.2px}
 .seg{display:flex;gap:6px;margin-bottom:10px}
 .seg button,.rot button{font:600 14px Barlow,system-ui,sans-serif;min-height:44px;border:0;border-radius:10px;background:var(--chip);color:var(--ink);cursor:pointer;flex:1;padding:0 8px}
 .seg button[aria-pressed="true"],.rot button[aria-pressed="true"]{background:var(--on);color:var(--onink)}
-button:focus-visible{outline:3px solid var(--OH);outline-offset:2px}
 .rot{display:grid;grid-template-columns:auto repeat(6,1fr);gap:6px;align-items:center;margin-bottom:12px}
 .rot span{font-weight:600;color:var(--muted);padding-right:4px}
 .rot button{font:700 18px "Barlow Condensed",sans-serif;padding:0}
@@ -62,7 +61,7 @@ svg.editing{touch-action:none}svg.editing .p{cursor:grab}textarea{width:100%;fon
 </head>
 <body>
 <main>
-<a href="../" class="muted" style="text-decoration:none">&larr; TMT: Volleyball Hub</a>
+<a class="back" href="../">&larr; TMT: Volleyball Hub</a>
 <h1>5-1 rotation guide</h1>
 <div class="seg" id="sys">
   <button data-s="1" aria-pressed="true">5-1 positioning</button>
