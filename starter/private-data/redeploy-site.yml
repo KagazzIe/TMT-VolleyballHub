@@ -1,6 +1,7 @@
 name: Redeploy hub site
 
-# Put this file at .github/workflows/redeploy-site.yml in your PRIVATE data repo.
+# Optional: only for teams that keep data in a separate PRIVATE repo.
+# Put this file at .github/workflows/redeploy-site.yml in that data repo.
 
 # Tells the public site repo to rebuild whenever team data changes here.
 # Needs the TEAM_DATA_TOKEN secret (same token as the site repo).

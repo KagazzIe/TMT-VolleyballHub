@@ -1,22 +1,26 @@
 name: Build and deploy a team hub
 
 # Shared (reusable) workflow. It builds the hub from this repo's code plus a
-# team's private data repo, and publishes the result to the CALLING repo's
-# GitHub Pages. Each team keeps its own site, URL and data.
+# team's data, and publishes the result to the CALLING repo's GitHub Pages.
+# Each team keeps its own site, URL and data.
 #
-# Callers: see starter/team-site/deploy.yml. The caller must grant
+# By default the team data is the calling repo itself (team.json,
+# rotations.json, clips/). A team can keep data in a separate private repo
+# instead by passing team_data_repo and a TEAM_DATA_TOKEN secret.
+#
+# Callers: see starter/deploy.yml. The caller must grant
 # contents: read, pages: write and id-token: write.
 
 on:
   workflow_call:
     inputs:
       team_data_repo:
-        description: Private data repo as owner/name. Defaults to "<calling repo>-data".
+        description: Repo holding the team data, as owner/name. Empty means the calling repo; "none" deploys with no team data.
         type: string
         default: ''
     secrets:
       TEAM_DATA_TOKEN:
-        description: Fine-grained token with Contents read on the data repo.
+        description: Only needed when team_data_repo is a separate private repo. Fine-grained token with Contents read on it.
         required: false
 
 jobs:
@@ -26,8 +30,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     env:
-      TEAM_DATA_REPO: ${{ inputs.team_data_repo || format('{0}-data', github.repository) }}
-      HAS_TEAM_TOKEN: ${{ secrets.TEAM_DATA_TOKEN != '' }}
+      TEAM_DATA_REPO: ${{ inputs.team_data_repo || github.repository }}
     steps:
       # Use the hub code from the same commit as this workflow file, so a team
       # on @v1 gets v1 code and a team on @main gets the latest.
@@ -61,17 +64,17 @@ jobs:
           persist-credentials: false
 
       - name: Get team data
-        if: env.HAS_TEAM_TOKEN == 'true'
+        if: env.TEAM_DATA_REPO != 'none'
         uses: actions/checkout@v4
         with:
           repository: ${{ env.TEAM_DATA_REPO }}
-          token: ${{ secrets.TEAM_DATA_TOKEN }}
+          token: ${{ secrets.TEAM_DATA_TOKEN || github.token }}
           path: team
           persist-credentials: false
 
       - name: Check team data and build clip index
         run: |
-          rm -rf team/.git team/.github starter
+          rm -rf team/.git team/.github team/.gitignore starter
           mkdir -p team/clips
           python3 - <<'PY'
           import json, pathlib, sys

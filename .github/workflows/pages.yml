@@ -1,15 +1,12 @@
 name: Deploy site
 
 # Demo site for the hub. It runs the shared workflow like a team's site does, but
-# from this commit instead of a release tag, and with no TEAM_DATA_TOKEN secret,
-# so it publishes the pages with no team data.
+# from this commit instead of a release tag, and with no team data.
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
-  repository_dispatch:
-    types: [team-data-updated]
 
 permissions:
   contents: read
@@ -24,5 +21,4 @@ jobs:
   deploy:
     uses: ./.github/workflows/deploy.yml
     with:
-      team_data_repo: ${{ vars.TEAM_DATA_REPO }}
-    secrets: inherit
+      team_data_repo: none
