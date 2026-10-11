@@ -103,6 +103,9 @@ await check('clips volume and YouTube controls', '/team/clips/', async p => {
   const yt = () => p.evaluate(() => { const q = __yt.players.filter(x => !x.destroyed).pop(); return { n: __yt.players.length, vol: q.vol, muted: q.muted, controls: q.opts.playerVars.controls }; });
   let s = await yt();
   expect(s.controls === 0 && s.vol === 100 && !s.muted, `player should start with our controls at full volume, got ${JSON.stringify(s)}`);
+  const frame = () => p.evaluate(() => { const f = document.querySelector('.vid iframe'), r = f.getBoundingClientRect(), box = document.querySelector('.vid').getBoundingClientRect(); return { w: f.offsetWidth, h: f.offsetHeight, shownW: Math.round(r.width), boxW: Math.round(box.width) }; });
+  let f = await frame();
+  expect(f.w === 1920 && f.h === 1080 && Math.abs(f.shownW - f.boxW) <= 1, `player should be laid out at 1920x1080 and scaled to the box, got ${JSON.stringify(f)}`);
   await p.$eval('#vol', el => { el.value = 30; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change')); });
   s = await yt(); expect(s.vol === 30 && !s.muted, `volume slider should set 30, got ${JSON.stringify(s)}`);
   await p.click('#mute'); s = await yt(); expect(s.muted, 'mute button should mute');
@@ -110,6 +113,8 @@ await check('clips volume and YouTube controls', '/team/clips/', async p => {
   await p.check('#ytc'); await p.waitForTimeout(150);
   s = await yt(); expect(s.n === 2 && s.controls === 1 && s.vol === 30, `YouTube controls should rebuild the player with controls on, got ${JSON.stringify(s)}`);
   expect(!(await p.isVisible('#shield')), 'click shield should be off so YouTube controls can be clicked');
+  f = await frame();
+  expect(f.w === f.boxW && f.shownW === f.boxW, `with YouTube controls the player should be normal size, got ${JSON.stringify(f)}`);
 });
 await check('marker shares volume and controls settings', '/team/clips/marker/', async p => {
   expect(await p.isChecked('#ytc') && (await p.inputValue('#vol')) === '30', 'settings from the clips page should carry over');

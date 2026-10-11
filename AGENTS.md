@@ -25,7 +25,11 @@ A demo site and team sites can share one origin (`user.github.io/a/`, `user.gith
 for example `'name@' + new URL('../', location.href).pathname` from a page one folder deep.
 Pure viewer preferences (playback speed, video size) may stay unscoped. Volume and the
 "YouTube controls" switch are shared by the clip pages as `tmt:volume`, `tmt:muted` and `tmt:ytcontrols`.
-YouTube no longer lets embeds set video quality; the YouTube controls switch exposes its own quality menu.
+YouTube no longer lets embeds set video quality (`setPlaybackQuality` does nothing); its automatic
+quality follows the player's layout size. So with our own controls the iframe is laid out at 1920x1080
+and scaled down with CSS (`.vid.hq`), which makes YouTube pick the highest quality up to 1080p
+(verified on a real 1080p video: 480p at normal size, 1080p this way). With YouTube controls on, the
+iframe is normal size so its bar stays usable, and its gear menu sets quality.
 
 ## Pages
 | Path | File | Notes |

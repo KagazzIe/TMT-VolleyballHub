@@ -25,6 +25,9 @@ main{display:grid;grid-template-columns:min(var(--pct,62%),calc(100% - 344px)) m
 .panel{background:var(--card);border-radius:var(--r);padding:12px}
 .vid{position:relative;aspect-ratio:16/9;background:#000;border-radius:var(--r-sm);overflow:hidden}
 .vid iframe{position:absolute;inset:0;width:100%;height:100%}
+/* With our own controls, YouTube's player is laid out at 1920x1080 and scaled down to fit, so its
+   automatic quality picks the highest available (up to 1080p). See AGENTS.md. */
+.vid.hq iframe{inset:auto;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;transform:scale(var(--yts,1))}
 #shield{position:absolute;inset:0;cursor:pointer}
 .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
 .sizectl{display:flex;align-items:center;gap:6px;color:var(--muted);margin-left:auto}
@@ -167,7 +170,7 @@ window.onYouTubeIframeAPIReady=()=>{apiReady=true;if(S.game.videoId)mount(S.game
 function mount(id,startAt){
   if(yt&&ready){yt.loadVideoById(id);return}
   if(yt)return;
-  yt=new YT.Player('player',{videoId:id,playerVars:{controls:ytControls?1:0,disablekb:1,rel:0,modestbranding:1,playsinline:1,start:Math.floor(startAt||0)},
+  yt=new YT.Player('player',{videoId:id,width:ytControls?'100%':1920,height:ytControls?'100%':1080,playerVars:{controls:ytControls?1:0,disablekb:1,rel:0,modestbranding:1,playsinline:1,start:Math.floor(startAt||0)},
     events:{onReady:()=>{ready=true;applyVol();if(+$('#rate').value!==1)yt.setPlaybackRate(+$('#rate').value)},onStateChange:syncPP}});
 }
 function parseId(v){const m=v.match(/(?:v=|youtu\.be\/|embed\/|shorts\/|live\/)([\w-]{11})/)||v.trim().match(/^([\w-]{11})$/);return m&&m[1]}
@@ -214,7 +217,13 @@ $('#vol').onchange=e=>{setPref('tmt:volume',vol);setPref('tmt:muted','0');e.targ
 $('#mute').onclick=()=>{muted=!(muted||!vol);if(!muted&&!vol)vol=50;setPref('tmt:muted',muted?'1':'0');setPref('tmt:volume',vol);applyVol()};
 // "YouTube controls" shows YouTube's own control bar (quality, captions, fullscreen). Websites can't
 // choose an embedded video's quality themselves, so this is how viewers pick it.
-const syncShield=()=>{$('#shield').hidden=ytControls};
+const syncShield=()=>{$('#shield').hidden=ytControls;vidBox.classList.toggle('hq',!ytControls)};
+// Keep the full-HD player scaled to the box
+const vidBox=document.querySelector('.vid');
+const fitPlayer=()=>vidBox.style.setProperty('--yts',vidBox.clientWidth/1920);
+try{new ResizeObserver(fitPlayer).observe(vidBox)}catch(e){addEventListener('resize',fitPlayer)}
+fitPlayer();
+
 $('#ytc').checked=ytControls;syncShield();syncVol();
 $('#ytc').onchange=e=>{ytControls=e.target.checked;setPref('tmt:ytcontrols',ytControls?'1':'0');syncShield();remakePlayer();e.target.blur()};
 function remakePlayer(){

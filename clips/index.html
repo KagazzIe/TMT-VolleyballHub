@@ -29,6 +29,9 @@ main>*{min-width:0}
 #stage{position:sticky;top:14px;background:var(--bg)}
 .vid{position:relative;aspect-ratio:16/9;background:#000;border-radius:var(--r);overflow:hidden}
 .vid iframe{position:absolute;inset:0;width:100%;height:100%}
+/* With our own controls, YouTube's player is laid out at 1920x1080 and scaled down to fit, so its
+   automatic quality picks the highest available (up to 1080p). See AGENTS.md. */
+.vid.hq iframe{inset:auto;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;transform:scale(var(--yts,1))}
 #shield{position:absolute;inset:0;cursor:pointer}
 #over{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(10,18,30,.72);color:#fff;text-align:center;padding:12px}
 #over .row{display:flex;gap:8px}
@@ -344,7 +347,7 @@ window.onYouTubeIframeAPIReady=()=>{apiReady=true;if(wantMake&&cur)make(cur)};
 const tag=document.createElement('script');tag.src='https://www.youtube.com/iframe_api';document.head.appendChild(tag);
 function make(c){
   loadedVid=c.vid;
-  yt=new YT.Player('player',{videoId:c.vid,playerVars:{controls:ytControls?1:0,disablekb:1,rel:0,modestbranding:1,playsinline:1,start:Math.floor(c.start)},
+  yt=new YT.Player('player',{videoId:c.vid,width:ytControls?'100%':1920,height:ytControls?'100%':1080,playerVars:{controls:ytControls?1:0,disablekb:1,rel:0,modestbranding:1,playsinline:1,start:Math.floor(c.start)},
     events:{onReady:()=>{ready=true;applyVol();go()},onStateChange:e=>{syncPP();if(e.data===1)applyRate()}}});
 }
 function go(){
@@ -434,7 +437,13 @@ $('#vol').onchange=e=>{setPref('tmt:volume',vol);setPref('tmt:muted','0');e.targ
 $('#mute').onclick=()=>{muted=!(muted||!vol);if(!muted&&!vol)vol=50;setPref('tmt:muted',muted?'1':'0');setPref('tmt:volume',vol);applyVol()};
 // "YouTube controls" shows YouTube's own control bar (quality, captions, fullscreen). Websites can't
 // choose an embedded video's quality themselves, so this is how viewers pick it.
-const syncShield=()=>{$('#shield').hidden=ytControls};
+const syncShield=()=>{$('#shield').hidden=ytControls;vidBox.classList.toggle('hq',!ytControls)};
+// Keep the full-HD player scaled to the box
+const vidBox=document.querySelector('.vid');
+const fitPlayer=()=>vidBox.style.setProperty('--yts',vidBox.clientWidth/1920);
+try{new ResizeObserver(fitPlayer).observe(vidBox)}catch(e){addEventListener('resize',fitPlayer)}
+fitPlayer();
+
 $('#ytc').checked=ytControls;syncShield();syncVol();
 $('#ytc').onchange=e=>{ytControls=e.target.checked;setPref('tmt:ytcontrols',ytControls?'1':'0');syncShield();remakePlayer();e.target.blur()};
 function remakePlayer(){
