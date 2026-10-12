@@ -82,7 +82,7 @@ svg.editing{touch-action:none}svg.editing .p{cursor:grab}textarea{width:100%;fon
   <span><i style="background:var(--OH)"></i>OH outside</span>
   <span><i style="background:var(--MB)"></i>MB middle</span>
   <span><i style="background:var(--OPP)"></i>OPP opposite</span>
-  <span><i style="background:var(--L)"></i>L libero (never serves)</span>
+  <span><i style="background:var(--L)"></i>L libero</span>
 </div>
 <div class="card muted" id="serveNote"><p>Overlap rule: when the ball is served, each back-row player stays behind their front-row partner (1 behind 2, 6 behind 3, 5 behind 4), and neighbors stay in order left to right.</p></div>
 <div class="card muted" id="baseNote" hidden><p><b>Reading the hitter:</b> hold base until the ball is set, then move. Count the rhythm: pass, set, hit. If you haven't seen the ball by "3," expect a tip.</p><p>Position ideas adapted from Stork Hsu's 5-1 positional defense diagrams (2003). Shaded areas are dig zones and they overlap where defenders share a ball. The setter covers only a small piece of court.</p></div>
@@ -152,8 +152,10 @@ function stateKey(){
   return view==='receive'?`rx|${rot}`:view==='serving'?`sv|${rot}|${lib}`:`bs|${rot}|${lib}`;
 }
 const rec=()=>{const k=stateKey();return(k&&EDITS[k])||{}};
-// Players the libero may replace: back row, not the setter, and not the server while we serve
-const backRow=()=>R.filter(r=>r!=='S'&&!front(slot(r,rot))&&!(view==='serving'&&slot(r,rot)===1));
+// Players the libero may replace: back row, not the setter. In the serving view that includes the
+// server (only if the team chooses it; the default never replaces the server).
+const backRow=()=>R.filter(r=>r!=='S'&&!front(slot(r,rot)));
+const isServer=r=>view==='serving'&&slot(r,rot)===1;
 // Default: the libero replaces the back-row middle, and is out while that middle serves
 function defaultLibero(){
   const mb=['MB1','MB2'].find(r=>!front(slot(r,rot)));
@@ -413,7 +415,7 @@ function updatePanel(){
   $('libSec').hidden=lib==='off';
   if(lib!=='off'){
     const d=defaultLibero()||'none';
-    fillSelect($('libSel'),[...backRow().map(p=>[p,p]),['none','Nobody (libero is out)']].map(([v,l])=>[v,l+(v===d?' (default)':'')]));
+    fillSelect($('libSel'),[...backRow().map(p=>[p,p+(isServer(p)?' (serving)':'')]),['none','Nobody (libero is out)']].map(([v,l])=>[v,l+(v===d?' (default)':'')]));
     $('libSel').value=liberoFor()||'none';
   }
   // Highlights

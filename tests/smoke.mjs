@@ -135,6 +135,20 @@ await check('rotations demo', '/demo/rotations/', async p => {
   const s = await p.evaluate(() => { const T = target(); pos = 0; const P = target(); pos = 1; return { same: JSON.stringify(T) === JSON.stringify(P), hl: hlText().length }; });
   expect(s.same, '5-1 view should default to plain rotation order');
   expect(s.hl === 0, 'no highlights without team data');
+  // Libero and the server: by default the libero never replaces the server, but a team can choose it
+  const lib = await p.evaluate(() => {
+    rot = 2; view = 'serving'; lib = 'left'; render();
+    const before = liberoFor();
+    edit = true; render();
+    const opts = [...document.querySelectorAll('#libSel option')].map(o => o.textContent);
+    const sel = document.getElementById('libSel'); sel.value = 'MB2'; sel.onchange({ target: sel });
+    const after = liberoFor(), head = document.getElementById('head').textContent;
+    sel.value = 'none'; sel.onchange({ target: sel }); edit = false; rot = 0; view = 'receive'; render();
+    return { before, opts, after, head };
+  });
+  expect(lib.before === null, `R3 serving should default to the libero being out, got ${lib.before}`);
+  expect(lib.opts.includes('MB2 (serving)'), `the server should be an option, got ${lib.opts}`);
+  expect(lib.after === 'MB2' && lib.head.includes('Libero replaces MB2'), `choosing the server should work, got ${JSON.stringify(lib)}`);
   // Drafts are per site: an edit on the demo must not show on the team site
   await p.click('#editBtn'); await p.fill('#noteText', 'demo only'); await p.waitForTimeout(500);
 });
