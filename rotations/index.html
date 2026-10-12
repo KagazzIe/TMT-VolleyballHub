@@ -33,6 +33,7 @@ svg{display:block;width:100%;height:auto;border-radius:12px;background:var(--car
 svg.editing{touch-action:none}svg.editing .p{cursor:grab}textarea{width:100%;font:12px/1.3 ui-monospace,monospace;background:var(--card);color:var(--ink);border:1px solid var(--chip);border-radius:8px;padding:6px}#warn:empty{display:none}#warn{color:#d6402f;font-weight:600;margin-top:6px}
 .seg button:disabled{opacity:.5;cursor:default}
 #status{margin:0 0 10px}
+#ghMsg a{color:var(--accent)}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:380px;max-width:100vw;background:var(--card);color:var(--ink);box-shadow:-10px 0 28px rgba(10,20,40,.22);overflow:auto;padding:12px 16px calc(24px + env(safe-area-inset-bottom,0px));z-index:20}
 .drawer .dhead{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .drawer h2{font:700 24px/1 "Barlow Condensed",sans-serif;margin:0}
@@ -58,6 +59,7 @@ svg.editing{touch-action:none}svg.editing .p{cursor:grab}textarea{width:100%;fon
   body.editing main{padding-bottom:48vh}
 }
 </style>
+<script src="../assets/github.js"></script>
 </head>
 <body>
 <main>
@@ -119,6 +121,9 @@ svg.editing{touch-action:none}svg.editing .p{cursor:grab}textarea{width:100%;fon
   <section class="filesec">
     <h3>Team file</h3>
     <p class="muted" id="fileMsg"></p>
+    <div class="seg" id="ghRow" hidden><button id="ghSave" class="pri">Save to GitHub</button></div>
+    <p class="muted" id="ghMsg" role="status" hidden></p>
+    <p id="ghStat" hidden></p>
     <div class="seg"><button id="exportBtn" class="pri">Export JSON</button><button id="importBtn">Load JSON</button></div>
     <div class="seg"><button id="revert">Revert to team file</button></div>
     <input type="file" id="importFile" accept=".json,application/json" hidden>
@@ -145,7 +150,8 @@ const kind=r=>r.replace(/\d/,'');
 const M=30,V=14;
 let pos=1,view='receive',rot=0,lib='left',edit=false,CUR={},tweenId=0,drag=null,confirmRevert=false;
 // EDITS and TEAM map a view key to {pos, libero, highlights, note}; every field is optional
-let TEAM={},TEAM_T=0,teamState='loading',EDITS={},draft=false;
+// pending: saved to GitHub from this browser, but the site hasn't redeployed with it yet
+let TEAM={},TEAM_T=0,teamState='loading',EDITS={},draft=false,pending=false;
 const slot=(r,n)=>{let s=START[r];for(let i=0;i<n;i++)s=nxt(s);return s};
 function stateKey(){
   if(pos!==1)return null;
@@ -320,7 +326,7 @@ function readFile(d){
 }
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}};
 const lsSet=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
-function saveDraft(){draft=true;lsSet(LS,{format:'tmt-rotations',version:2,updated:Date.now(),views:EDITS})}
+function saveDraft(){draft=true;pending=false;lsSet(LS,{format:'tmt-rotations',version:2,updated:Date.now(),views:EDITS})}
 // Change one field of a view's record; empty records are dropped
 function setRec(k,fn){
   if(!k)return;
@@ -333,13 +339,16 @@ async function loadTeam(){
   let st='missing',f=null;
   try{const r=await fetch(TEAM_URL,{cache:'no-cache'});if(r.ok){st='invalid';f=readFile(await r.json());if(f)st='loaded'}}catch(e){}
   teamState=st;TEAM=f?f.views:{};TEAM_T=f?f.t:0;
-  const d=readFile(lsGet(LS));
-  if(d&&d.t>TEAM_T){EDITS=deep(d.views);draft=true}else{EDITS=deep(TEAM);draft=false}
+  const raw=lsGet(LS),d=readFile(raw),saved=!!(raw&&raw.saved);
+  if(d&&d.t>TEAM_T){
+    EDITS=deep(d.views);draft=!saved;pending=saved;
+    if(saved){TEAM=deep(d.views);TEAM_T=d.t}
+  }else{EDITS=deep(TEAM);draft=false;if(saved)lsSet(LS,null)}
   render();
 }
-function exportText(){
+function exportText(t){
   const ks=Object.keys(EDITS).sort();
-  return '{\n  "format": "tmt-rotations",\n  "version": 2,\n  "updated": '+Date.now()+',\n  "views": {'+ks.map(k=>'\n    '+JSON.stringify(k)+': '+JSON.stringify(norm(EDITS[k]))).join(',')+'\n  }\n}\n';
+  return '{\n  "format": "tmt-rotations",\n  "version": 2,\n  "updated": '+(t||Date.now())+',\n  "views": {'+ks.map(k=>'\n    '+JSON.stringify(k)+': '+JSON.stringify(norm(EDITS[k]))).join(',')+'\n  }\n}\n';
 }
 function moveTo(r,x,y){
   CUR[r]=[Math.round(Math.min(286,Math.max(14,x))),Math.round(Math.min(358,Math.max(14,y)))];
@@ -347,7 +356,7 @@ function moveTo(r,x,y){
 }
 function commit(){setRec(stateKey(),r=>{r.pos=clone(CUR)});updateUI(CUR)}
 function resetView(){const k=stateKey();if(k&&EDITS[k]){delete EDITS[k];saveDraft()}render()}
-function revert(){EDITS=deep(TEAM);draft=false;lsSet(LS,null);render()}
+function revert(){EDITS=deep(TEAM);draft=false;if(!pending)lsSet(LS,null);render()}
 // Drawing
 const svg=document.getElementById('court');
 let h='<defs><clipPath id="cc"><rect x="20" y="20" width="260" height="310"/></clipPath><filter id="bl" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="2.5"/></filter></defs>';
@@ -427,7 +436,7 @@ function updatePanel(){
   // Note
   const nt=$('noteText');if(changed||document.activeElement!==nt)nt.value=r.note||'';
   // Team file
-  $('fileMsg').textContent=(teamState==='loaded'?`Team file last updated ${fmtDate(TEAM_T)}.`:teamState==='invalid'?'The team file could not be read.':teamState==='missing'?'No team file is published yet.':'')+(draft?' You have edits that are not in the team file yet.':'');
+  $('fileMsg').textContent=pending?'Saved to GitHub. Your site shows it once the update finishes, in about two minutes.':(teamState==='loaded'?`Team file last updated ${fmtDate(TEAM_T)}.`:teamState==='invalid'?'The team file could not be read.':teamState==='missing'?'No team file is published yet.':'')+(draft?' You have edits that are not in the team file yet.':'');
   $('revert').textContent=confirmRevert?'Tap again to discard your edits':'Revert to team file';
   $('revert').disabled=!draft;
 }
@@ -450,7 +459,7 @@ function updateUI(P){
   ['libWrap','view','editRow'].forEach(i=>$(i).hidden=!p);
   $('serveNote').hidden=p&&view==='base';$('baseNote').hidden=!(p&&view==='base');
   svg.classList.toggle('editing',edit&&!!k);
-  $('status').textContent=draft?'Showing your local edits, which are not in the team file yet.'+(edit?'':' Open Edit positions to export them.'):teamState==='missing'?'No team positions are published yet, so these are default positions.':teamState==='invalid'?'The team positions file could not be read, so these are default positions.':'';
+  $('status').textContent=pending?'Showing the positions you saved to GitHub. Your site updates in about two minutes.':draft?'Showing your local edits, which are not in the team file yet.'+(edit?'':TMTGitHub.repo?' Open Edit positions to save them.':' Open Edit positions to export them.'):teamState==='missing'?'No team positions are published yet, so these are default positions.':teamState==='invalid'?'The team positions file could not be read, so these are default positions.':'';
   $('status').hidden=!$('status').textContent;
   updatePanel();
   showWarn(P||CUR);
@@ -499,6 +508,28 @@ $('expCopy').onclick=()=>{
 };
 $('expDl').onclick=()=>{
   try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([$('expText').value],{type:'application/json'}));a.download='rotations.json';document.body.appendChild(a);a.click();a.remove()}catch(e){}
+};
+// Save to GitHub (team sites only): commits rotations.json straight to the team repository
+TMTGitHub.ready.then(site=>{
+  if(!site)return;
+  $('ghRow').hidden=false;$('exportBtn').classList.remove('pri');TMTGitHub.status($('ghStat'));updateUI();
+});
+const ghMsg=(t,link)=>{const m=$('ghMsg');m.hidden=!t;m.textContent=t||'';if(link){m.append(' ');const a=document.createElement('a');a.href=link;a.target='_blank';a.rel='noopener';a.textContent='Watch it update';m.appendChild(a)}};
+$('ghSave').onclick=async()=>{
+  const t=Date.now(),text=exportText(t),views=deep(EDITS),b=$('ghSave');
+  b.disabled=true;ghMsg('');
+  try{
+    const r=await TMTGitHub.save({path:'rotations.json',text,message:'Update rotations.json from the rotation guide',
+      // Fine to replace when GitHub still has the team file this page loaded
+      isSafe:remote=>{try{const d=JSON.parse(remote);return TEAM_T>0&&+d.updated===TEAM_T}catch(e){return false}},
+      conflict:'rotations.json was changed on GitHub since you opened this page, maybe by someone else. Replace it with your version?'});
+    if(r){
+      TEAM=views;TEAM_T=t;draft=false;pending=true;
+      lsSet(LS,{format:'tmt-rotations',version:2,updated:t,views,saved:true});
+      ghMsg('Saved to GitHub.',r.actionsUrl);render();
+    }
+  }catch(e){ghMsg(e.message)}
+  b.disabled=false;
 };
 $('importBtn').onclick=()=>$('importFile').click();
 $('importFile').onchange=async e=>{

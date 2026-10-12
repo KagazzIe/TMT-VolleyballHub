@@ -69,7 +69,10 @@ textarea{width:100%;min-height:150px;margin-top:6px}
 #hkmsg{color:var(--alert)}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ok);color:#fff;padding:6px 16px;border-radius:99px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none}
 #toast.on{opacity:1}
+#toast.err{background:var(--alert)}
+#ghStat{margin:0 0 10px}
 </style>
+<script src="../../assets/github.js"></script>
 </head>
 <body>
 <div id="warn">YouTube blocks playback on pages opened straight from a file. Run <code>python3 -m http.server</code> in this folder and open <code>http://localhost:8000/</code>, or host it on GitHub Pages.</div>
@@ -109,12 +112,14 @@ textarea{width:100%;min-height:150px;margin-top:6px}
     <div class="row" style="justify-content:space-between;margin-bottom:8px">
       <strong id="count">0 clips</strong>
       <span class="row">
+        <button id="ghSave" class="pri" hidden>Save to GitHub</button>
         <button id="dl" class="pri">Download JSON</button>
         <button id="cp">Copy</button>
         <button id="imp">Import</button>
         <input type="file" id="file" accept=".json" hidden>
       </span>
     </div>
+    <p id="ghStat" hidden></p>
     <div class="chips" id="chips"></div>
     <div id="list"></div>
   </section>
@@ -158,7 +163,7 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const sortClips=()=>S.clips.sort((a,b)=>a.start-b.start);
 const cur=()=>ready?yt.getCurrentTime():0;
 const dur=()=>ready?yt.getDuration():0;
-let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),1200)};
+let tt;const toast=(m,ms,err)=>{const t=$('#toast');t.textContent=m;t.classList.toggle('err',!!err);t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),ms||1200)};
 
 if(location.protocol==='file:')$('#warn').style.display='block';
 
@@ -291,13 +296,13 @@ function renderList(){
   const players=[...new Set([...S.roster,...S.clips.flatMap(c=>c.players)])];
   const acts=[...new Set([...ACTIONS.map(a=>a[1]),...S.clips.map(c=>c.action).filter(Boolean)])];
   $('#list').innerHTML=S.clips.length?S.clips.map((c,i)=>`
-  <div class="clip ${c.id===sel?'sel':''}" data-id="${c.id}">
+  <div class="clip ${c.id===sel?'sel':''}" data-id="${esc(c.id)}">
     <div class="row"><button data-a="play" title="Preview (Enter)">▶</button><strong>Clip ${i+1}</strong>
       <span class="mut span">${fmt(c.start)}–${fmt(c.end)} · ${r1(c.end-c.start)}s</span><span style="flex:1"></span>
       <button data-a="del" title="Delete clip" aria-label="Delete clip">✕</button></div>
-    <div class="row"><label class="mut">Start <input type="number" step="0.5" min="0" data-f="start" value="${c.start}"></label>
+    <div class="row"><label class="mut">Start <input type="number" step="0.5" min="0" data-f="start" value="${+c.start||0}"></label>
       <button data-a="s-now" title="Set start to the current video time">Use now</button>
-      <label class="mut">End <input type="number" step="0.5" min="0" data-f="end" value="${c.end}"></label>
+      <label class="mut">End <input type="number" step="0.5" min="0" data-f="end" value="${+c.end||0}"></label>
       <button data-a="e-now" title="Set end to the current video time">Use now</button></div>
     <div class="row">
       ${c.players.map(n=>`<span class="tag">${esc(n)}<button data-a="rm" data-p="${esc(n)}" aria-label="Remove ${esc(n)}">✕</button></span>`).join('')}<select data-f="addplayer" aria-label="Add player"><option value="">${c.players.length?'Add another player':'Add player'}</option>${players.filter(n=>!c.players.includes(n)).map(n=>`<option>${esc(n)}</option>`).join('')}</select></div>
@@ -442,6 +447,25 @@ $('#dl').onclick=()=>{
   const b=new Blob([JSON.stringify(out(),null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(b);
   a.download=fileName();a.click();renderList();
+};
+// Save to GitHub (team sites only): commits this game's file to the clips folder of the team repository.
+// A game keeps the file name it was first saved under, so renaming it later updates the same file.
+TMTGitHub.ready.then(site=>{
+  if(!site)return;
+  $('#ghSave').hidden=false;$('#dl').classList.remove('pri');TMTGitHub.status($('#ghStat'));
+});
+$('#ghSave').onclick=async()=>{
+  if(!S.clips.length)return toast('Mark some clips first');
+  if(!S.game.name&&!confirm('This game has no name yet, and the team page shows it. Save anyway?'))return;
+  const b=$('#ghSave'),gid=S.game.id,path=S.game.file||'clips/'+fileName(),isNew=!S.game.file;
+  b.disabled=true;
+  try{
+    const r=await TMTGitHub.save({path,text:JSON.stringify(out(),null,2)+'\n',message:(isNew?'Add ':'Update ')+path+' from Clip Marker',
+      isSafe:remote=>{try{return JSON.parse(remote).game.id===gid}catch(e){return false}},
+      conflict:`There's already a different game saved as ${path}. Replace it with this one?`});
+    if(r){if(S.game.id===gid){S.game.file=path;save()}toast('Saved to GitHub. The team page updates in about two minutes.',3500);renderList()}
+  }catch(e){toast(e.message,6000,true)}
+  b.disabled=false;
 };
 $('#cp').onclick=async()=>{
   try{await navigator.clipboard.writeText(JSON.stringify(out(),null,2));toast('Copied JSON');renderList()}

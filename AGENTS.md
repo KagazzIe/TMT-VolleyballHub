@@ -16,14 +16,16 @@ team's own repo and is copied to `team/` at deploy time by `.github/workflows/de
 - Teams run `@v1` of the shared workflow. Only move the `v1` tag once `main` is tested.
 - `starter/` is the content of the public team template repo (KagazzIe/TMT-VolleyballHub-team-template).
   Keep the two in sync, and keep its README readable by non-technical captains.
-- Team captains are often not technical. Every data change should be "download a file from the hub,
-  upload it on GitHub": never ask them to hand-edit JSON or create files in `.github/`.
+- Team captains are often not technical. Every data change should be "Save to GitHub" from the hub, with
+  "download a file, upload it on GitHub" as the fallback: never ask them to hand-edit JSON or create
+  files in `.github/`.
 
 ## Browser storage
 A demo site and team sites can share one origin (`user.github.io/a/`, `user.github.io/b/`), and
 `localStorage` is per origin. Key anything site-specific (drafts, tool state) by the site's base path,
 for example `'name@' + new URL('../', location.href).pathname` from a page one folder deep.
-Pure viewer preferences (playback speed, video size) may stay unscoped. Volume is shared by the clip
+Pure viewer preferences (playback speed, video size) may stay unscoped. The GitHub token for Save to GitHub
+is `tmt:github@<base path>` (sessionStorage, or localStorage when "Remember" is checked). Volume is shared by the clip
 pages as `tmt:volume` and `tmt:muted`.
 
 YouTube no longer lets embeds set video quality (`setPlaybackQuality` does nothing); its automatic
@@ -36,12 +38,24 @@ the pages provide play, seek, speed and volume.
 | Path | File | Notes |
 |---|---|---|
 | `/` | `index.html` | Hub. Shows a demo note when no `team/team.json` exists. |
-| `/rotations/` | `rotations/index.html` | 5-1 rotation guide and its editor (exports `rotations.json`). |
+| `/rotations/` | `rotations/index.html` | 5-1 rotation guide and its editor (saves or exports `rotations.json`). |
 | `/clips/` | `clips/index.html` | Match clip viewer. |
-| `/clips/marker/` | `clips/marker/index.html` | Clip Marker, exports one game JSON. |
-| `/setup/` | `setup/index.html` | Team Setup, a form that downloads `team.json` (`name`, `roster`, `labels`). Team `labels` set Clip Marker's play list and the viewer's filter order; without them the defaults are Serve, Receive, Set, Hit, Block. |
+| `/clips/marker/` | `clips/marker/index.html` | Clip Marker, saves or exports one game JSON. |
+| `/setup/` | `setup/index.html` | Team Setup, a form that saves or downloads `team.json` (`name`, `roster`, `labels`). Team `labels` set Clip Marker's play list and the viewer's filter order; without them the defaults are Serve, Receive, Set, Hit, Block. |
 
-Each page is one self-contained HTML file with inline CSS and JS, plus the shared stylesheet.
+Each page is one self-contained HTML file with inline CSS and JS, plus the shared stylesheet. The one
+shared script is `assets/github.js` (Save to GitHub), used by Team Setup, the rotation editor and Clip Marker.
+
+## Save to GitHub (`assets/github.js`)
+- `TMTGitHub.ready` resolves to `{repo}` from `team/site.json` (written by the deploy), or `null` on the demo.
+  Keep Save buttons `hidden` until it resolves with a repo.
+- `TMTGitHub.save({path, text, message, isSafe, conflict})` asks to connect if needed, checks the current
+  file, and commits. `isSafe(remoteText)` says when replacing what's on GitHub is fine (for example the
+  file this page loaded); otherwise it asks with `conflict`. Resolves `null` if the person cancels, and
+  throws an Error with a plain-language message on failure.
+- `TMTGitHub.status(el)` shows the "Saving to owner/repo as @name. Disconnect" line.
+- The token is sent only to `api.github.com`. Pages show team data, so always escape it before putting it in
+  HTML (`esc()`), since a script injected through a game file could read the token.
 
 ## Theme: always use `assets/theme.css`
 Every page links the Google Fonts stylesheet and `assets/theme.css` (relative path), then its own

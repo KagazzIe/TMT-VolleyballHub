@@ -26,7 +26,10 @@ function resolve(urlPath) {
   if (rest.startsWith('/tests/')) return null;
   return path.join(ROOT, rest);
 }
+// The deploy writes team/site.json (which repo "Save to GitHub" commits to); fake it for the team site
+const SITE_JSON = JSON.stringify({ repo: 'sample-owner/sample-team' });
 const server = http.createServer((req, res) => {
+  if (req.url.split('?')[0] === '/team/team/site.json') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(SITE_JSON); }
   let f = resolve(req.url);
   if (f && fs.existsSync(f) && fs.statSync(f).isDirectory()) f = path.join(f, 'index.html');
   if (!f || !fs.existsSync(f)) { res.writeHead(404); return res.end('not found'); }
@@ -35,6 +38,29 @@ const server = http.createServer((req, res) => {
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const BASE = `http://127.0.0.1:${server.address().port}`;
+
+// Fake GitHub API: one repo, one good token. GH.files maps path -> { text, sha }.
+const GOOD_TOKEN = 'github_pat_sample';
+const GH = { files: {}, puts: [], n: 0 };
+const b64 = t => Buffer.from(t, 'utf8').toString('base64');
+async function fakeGitHub(route) {
+  const req = route.request(), u = new URL(req.url());
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET, PUT' };
+  const send = (status, body) => route.fulfill({ status, headers: cors, contentType: 'application/json', body: JSON.stringify(body) });
+  if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+  if (req.headers()['authorization'] !== 'Bearer ' + GOOD_TOKEN) return send(401, { message: 'Bad credentials' });
+  if (u.pathname === '/user') return send(200, { login: 'sample-captain' });
+  if (u.pathname === '/repos/sample-owner/sample-team') return send(200, { full_name: 'sample-owner/sample-team' });
+  const m = u.pathname.match(/^\/repos\/sample-owner\/sample-team\/contents\/(.+)$/);
+  if (!m) return send(404, { message: 'Not Found' });
+  const file = decodeURIComponent(m[1]), f = GH.files[file];
+  if (req.method() === 'GET') return f ? send(200, { sha: f.sha, encoding: 'base64', content: b64(f.text) }) : send(404, { message: 'Not Found' });
+  const body = JSON.parse(req.postData());
+  if (f && body.sha !== f.sha) return send(body.sha ? 409 : 422, { message: 'sha mismatch' });
+  GH.files[file] = { text: Buffer.from(body.content, 'base64').toString('utf8'), sha: 'sha' + (++GH.n) };
+  GH.puts.push({ file, message: body.message });
+  return send(f ? 200 : 201, { content: { sha: GH.files[file].sha }, commit: { html_url: 'https://github.com/sample-owner/sample-team/commit/x' } });
+}
 
 const failures = [];
 const fail = (where, msg) => failures.push(`${where}: ${msg}`);
@@ -51,6 +77,7 @@ async function open(ctx, url, where) {
   await page.route('**/*', r => {
     const u = r.request().url();
     if (u.startsWith(BASE)) return r.continue();
+    if (u.startsWith('https://api.github.com/')) return fakeGitHub(r);
     if (u.startsWith('https://www.youtube.com/iframe_api')) return r.fulfill({ contentType: 'text/javascript', body: ytStub });
     return r.abort();
   });
@@ -184,6 +211,83 @@ await check('setup demo', '/demo/setup/', async p => {
   expect(dl.suggestedFilename() === 'team.json', 'file should be named team.json');
   const out = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
   expect(out.name === 'New Team' && out.roster.join() === 'Ana,Bo,Cy' && out.labels.join() === 'Serve,Receive,Set,Hit,Block', `unexpected team.json: ${JSON.stringify(out)}`);
+});
+
+// Save to GitHub
+const CONN = JSON.stringify({ token: GOOD_TOKEN, login: 'sample-captain', repo: 'sample-owner/sample-team' });
+await check('save hidden on the demo', '/demo/setup/', async p => {
+  expect(!(await p.isVisible('#gh')) && !(await p.isVisible('#ghstat')), 'Save to GitHub should not show without site.json');
+  await p.goto(BASE + '/demo/rotations/'); await p.waitForTimeout(400); await p.click('#editBtn');
+  expect(!(await p.isVisible('#ghSave')), 'rotation editor should not offer Save to GitHub on the demo');
+  await p.goto(BASE + '/demo/clips/marker/'); await p.waitForTimeout(400);
+  expect(!(await p.isVisible('#ghSave')), 'Clip Marker should not offer Save to GitHub on the demo');
+});
+await check('setup saves to GitHub', '/team/setup/', async p => {
+  GH.files = { 'team.json': { text: fs.readFileSync(path.join(FIXTURE, 'team.json'), 'utf8'), sha: 'old' } }; GH.puts = [];
+  expect(await p.isVisible('#gh'), 'Save to GitHub should show on a team site');
+  await p.fill('#tname', 'Sample Squad B');
+  await p.click('#gh');
+  expect(await p.isVisible('.ghdlg'), 'first save should ask to connect');
+  const link = await p.getAttribute('#ghlink', 'href');
+  expect(link.startsWith('https://github.com/settings/personal-access-tokens/new?') && link.includes('contents=write') && link.includes('target_name=sample-owner'), `token link should be pre-filled, got ${link}`);
+  await p.fill('#ghtok', 'not-a-token'); await p.click('#ghgo'); await p.waitForTimeout(200);
+  expect((await p.innerText('#gherr')).includes('accept'), 'a bad token should be explained');
+  await p.fill('#ghtok', GOOD_TOKEN); await p.check('#ghrem'); await p.click('#ghgo'); await p.waitForTimeout(300);
+  expect(!(await p.isVisible('.ghdlg')), 'dialog should close once connected');
+  expect((await p.innerText('#msg')).startsWith('Saved to GitHub'), `should confirm the save, got ${await p.innerText('#msg')}`);
+  const saved = JSON.parse(GH.files['team.json'].text);
+  expect(saved.name === 'Sample Squad B' && saved.roster.length === 6, `team.json on GitHub should be updated, got ${JSON.stringify(saved)}`);
+  expect((await p.innerText('#ghstat')).includes('@sample-captain'), 'should show who is connected');
+  // Someone else changes the file: saving again asks first, and cancelling leaves it alone
+  GH.files['team.json'] = { text: '{"name":"Changed elsewhere","roster":[]}\n', sha: 'other' };
+  let asked = '';
+  p.once('dialog', d => { asked = d.message(); d.dismiss(); });
+  await p.click('#gh'); await p.waitForTimeout(300);
+  expect(asked.includes('changed on GitHub'), `should warn about a change made elsewhere, got "${asked}"`);
+  expect(GH.files['team.json'].sha === 'other', 'cancelling must not overwrite');
+  // Disconnect forgets the token
+  await p.click('#ghstat button');
+  expect(await p.evaluate(() => !TMTGitHub.connected && !localStorage.getItem('tmt:github@/team/')), 'Disconnect should forget the token');
+});
+await check('rotations save to GitHub', '/team/rotations/', async p => {
+  GH.files = { 'rotations.json': { text: fs.readFileSync(path.join(FIXTURE, 'rotations.json'), 'utf8'), sha: 'old' } }; GH.puts = [];
+  await p.evaluate(c => localStorage.setItem('tmt:github@/team/', c), CONN);
+  await p.reload(); await p.waitForTimeout(600);
+  await p.click('#editBtn');
+  expect(await p.isVisible('#ghSave'), 'editor should offer Save to GitHub');
+  expect((await p.innerText('#ghStat')).includes('@sample-captain'), 'a remembered connection should be used');
+  await p.fill('#noteText', 'Saved from the hub'); await p.waitForTimeout(500);
+  await p.click('#ghSave'); await p.waitForTimeout(300);
+  const saved = JSON.parse(GH.files['rotations.json'].text);
+  expect(saved.format === 'tmt-rotations' && saved.views['rx|0'].note === 'Saved from the hub', 'rotations.json on GitHub should have the new note');
+  const s = await p.evaluate(() => ({ draft, pending, status: document.getElementById('status').textContent }));
+  expect(!s.draft && s.pending && s.status.includes('saved to GitHub'), `page should show the save is on its way, got ${JSON.stringify(s)}`);
+  await p.reload(); await p.waitForTimeout(600);
+  const r = await p.evaluate(() => ({ draft, pending, note: rec().note }));
+  expect(!r.draft && r.pending && r.note === 'Saved from the hub', `saved positions should survive a reload until the site updates, got ${JSON.stringify(r)}`);
+  await p.evaluate(() => localStorage.clear());
+});
+await check('marker saves a game to GitHub', '/team/clips/marker/', async p => {
+  GH.files = {}; GH.puts = [];
+  await p.evaluate(c => localStorage.setItem('tmt:github@/team/', c), CONN);
+  await p.reload(); await p.waitForTimeout(600);
+  await p.fill('#url', 'https://www.youtube.com/watch?v=M7lc1UVf-VE'); await p.click('#load'); await p.waitForTimeout(150);
+  await p.fill('#gname', 'Saved Game'); await p.fill('#gdate', '2026-02-01');
+  await p.click('#mark');
+  await p.click('#ghSave'); await p.waitForTimeout(300);
+  const name = 'clips/2026-02-01-saved-game.json';
+  expect(GH.files[name] && JSON.parse(GH.files[name].text).clips.length === 1, `game file should be in clips/, got ${Object.keys(GH.files)}`);
+  // Renaming the game keeps saving to the same file
+  await p.fill('#gname', 'Saved Game Renamed'); await p.click('#ghSave'); await p.waitForTimeout(300);
+  expect(Object.keys(GH.files).join() === name && JSON.parse(GH.files[name].text).game.name === 'Saved Game Renamed', `renamed game should update the same file, got ${Object.keys(GH.files)}`);
+  expect(GH.puts.map(x => x.message.split(' ')[0]).join() === 'Add,Update', `commit messages, got ${GH.puts.map(x => x.message)}`);
+  // An expired token is forgotten, with a plain explanation
+  await p.evaluate(() => localStorage.setItem('tmt:github@/team/', JSON.stringify({ token: 'expired', login: 'sample-captain', repo: 'sample-owner/sample-team' })));
+  await p.reload(); await p.waitForTimeout(600);
+  await p.click('#ghSave'); await p.waitForTimeout(300);
+  expect((await p.innerText('#toast')).includes('stopped working'), `expired token should be explained, got ${await p.innerText('#toast')}`);
+  expect(await p.evaluate(() => !TMTGitHub.connected && !localStorage.getItem('tmt:github@/team/')), 'expired token should be forgotten');
+  await p.evaluate(() => localStorage.clear());
 });
 
 // Starter files must stay valid

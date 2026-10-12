@@ -24,13 +24,15 @@ button.pri,button.pri:hover{background:var(--on);color:var(--onink)}
 #msg.ok{color:var(--ok)}
 ol{margin:6px 0 0;padding-left:22px}ol li{margin:4px 0}
 #loaded{color:var(--muted);font-size:14px;margin:0 0 12px}
+#msg a{color:inherit}
 </style>
+<script src="../assets/github.js"></script>
 </head>
 <body>
 <main>
   <a class="back" href="../">&larr; TMT: Volleyball Hub</a>
   <h1>Team setup</h1>
-  <p class="intro">Fill this in and download your <b>team.json</b> file. It sets your team's name on the hub, and the players and play labels in Clip Marker.</p>
+  <p class="intro">Fill this in, then save or download your <b>team.json</b> file. It sets your team's name on the hub, and the players and play labels in Clip Marker.</p>
   <p id="loaded" hidden>Filled in from your team's current file.</p>
   <div class="card">
     <label for="tname">Team name</label>
@@ -46,10 +48,11 @@ Set
 Hit
 Block</textarea>
     <div class="hint">The kinds of plays you tag in Clip Marker, one per line, in the order you want them listed. Add your own, like Dig or Free ball. Renaming a label later doesn't rename clips you already tagged.</div>
-    <div class="row"><button id="dl" class="pri">Download team.json</button><button id="cp">Copy text</button></div>
+    <div class="row"><button id="gh" class="pri" hidden>Save to GitHub</button><button id="dl" class="pri">Download team.json</button><button id="cp">Copy text</button></div>
     <p id="msg" role="status"></p>
+    <p id="ghstat" hidden></p>
   </div>
-  <div class="card">
+  <div class="card" id="steps">
     <label>Then put it on your site</label>
     <ol>
       <li>Open your team's repository on GitHub.</li>
@@ -70,6 +73,8 @@ function build(){
   return JSON.stringify({name,roster:lines('roster'),labels},null,2)+'\n';
 }
 function done(t){$('msg').className='ok';$('msg').textContent=t}
+function oops(t){$('msg').className='';$('msg').textContent=t}
+let current=null;  // the team file this page started from, to notice changes made by someone else
 $('dl').onclick=()=>{
   const txt=build();if(!txt)return;
   try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download='team.json';document.body.appendChild(a);a.click();a.remove();done('Downloaded team.json. Now upload it to your team repository (steps below).')}catch(e){$('msg').textContent='Download was blocked. Use Copy text instead.'}
@@ -78,9 +83,27 @@ $('cp').onclick=async()=>{
   const txt=build();if(!txt)return;
   try{await navigator.clipboard.writeText(txt);done('Copied. Paste it into a file named team.json.')}catch(e){$('msg').textContent='Copy was blocked by the browser.'}
 };
+// Save to GitHub (team sites only): commits team.json straight to the team repository
+TMTGitHub.ready.then(site=>{
+  if(!site)return;
+  $('gh').hidden=false;$('dl').classList.remove('pri');TMTGitHub.status($('ghstat'));
+  $('steps').querySelector('label').textContent='Or download it and upload it yourself';
+});
+$('gh').onclick=async()=>{
+  const txt=build();if(!txt)return;
+  $('gh').disabled=true;oops('');
+  try{
+    const r=await TMTGitHub.save({path:'team.json',text:txt,message:'Update team.json from Team Setup',
+      isSafe:remote=>{try{return JSON.stringify(JSON.parse(remote))===JSON.stringify(current)}catch(e){return false}},
+      conflict:'team.json was changed on GitHub since you opened this page, maybe by someone else. Replace it with yours?'});
+    if(r){done('Saved to GitHub. Your site updates in about two minutes. ');const a=document.createElement('a');a.href=r.actionsUrl;a.target='_blank';a.rel='noopener';a.textContent='Watch it update';$('msg').appendChild(a)}
+  }catch(e){oops(e.message)}
+  $('gh').disabled=false;
+};
 // On a team site, start from the current team file
 fetch('../team/team.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null).then(t=>{
   if(!t)return;
+  current=t;
   if(typeof t.name==='string')$('tname').value=t.name;
   if(Array.isArray(t.roster))$('roster').value=t.roster.map(String).join('\n');
   if(Array.isArray(t.labels)&&t.labels.length)$('labels').value=t.labels.map(String).join('\n');

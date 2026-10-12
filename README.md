@@ -47,17 +47,20 @@ something goes wrong.
 on this hub links to your team.
 
 ## Updating your team's data
-Every change works the same way: make it on your hub site, download the file, and upload it to your
-repository (**Add file → Upload files → Commit changes**). The site updates about two minutes later.
+Make the change on your hub site, then click **Save to GitHub**. The site updates about two minutes later.
+The first time, the hub walks you through making a GitHub token that can only change files in your
+team's repository. Your team repository's front page explains it step by step.
 
-| To change | Use | Upload |
+Or download the file and upload it to your repository yourself (**Add file → Upload files → Commit changes**).
+
+| To change | Use | File |
 |---|---|---|
 | Team name, players or play labels | **Team Setup** | `team.json` |
-| Rotation positions, highlights and notes | **5-1 Rotation Guide → Edit positions → Export JSON** | `rotations.json` |
-| Add a match | **Clip Marker → Download JSON** | the game file, into the `clips` folder |
+| Rotation positions, highlights and notes | **5-1 Rotation Guide → Edit positions** | `rotations.json` |
+| Add a match | **Clip Marker** | the game file, in the `clips` folder |
 
 You can try the rotation editor and Clip Marker on the [demo site](https://kagazzie.github.io/TMT-VolleyballHub/)
-first. Nothing changes on any team's site until a file is uploaded.
+first. Nothing changes on any team's site until a file is saved or uploaded.
 
 ## How it works (for developers)
 This repo holds **code only**. Each team has its **own repo** with its data and one small workflow file:
@@ -78,6 +81,12 @@ redeploys it, and it also redeploys every Monday to pick up hub updates (GitHub 
 runs in repos with no commits for 60 days).
 
 The team template repo is a copy of `starter/`. When `starter/` changes, copy it there too.
+
+**Save to GitHub** (`assets/github.js`) commits files with GitHub's Contents API straight from the browser,
+using a fine-grained token the person makes for their team repo (Contents: read and write). The token is
+kept only in that browser. The deploy writes `team/site.json` (`{"repo": "owner/name"}`, the data repo) into
+the published site so the pages know where to save. It isn't committed anywhere, so this repo never names a
+team. Without it, as on the demo, the Save buttons stay hidden.
 
 ### Optional: keep data in a separate private repo (advanced)
 This keeps the data off GitHub's repo pages, though the deployed site still serves it.
@@ -108,7 +117,6 @@ Design and data rules for new pages are in [`AGENTS.md`](AGENTS.md).
   **Settings → Rules → Rulesets → New ruleset → Import a ruleset**. Admins can bypass both.
 - This repo's own site is a demo with no team data. It uses the shared workflow from the current
   commit, so pushing to `main` shows the latest code there before you release it to teams.
-- The Team of Misfit Toys runs as a normal team from its own repo.
 - When `main` is stable, move the `v1` tag so `@v1` teams get the update:
   ```
   git tag -f v1
