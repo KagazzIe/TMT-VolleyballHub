@@ -56,7 +56,7 @@ Or download the file and upload it to your repository yourself (**Add file → U
 | To change | Use | File |
 |---|---|---|
 | Team name, players or play labels | **Team Setup** | `team.json` |
-| Rotation positions, highlights and notes | **5-1 Rotation Guide → Edit positions** | `rotations.json` |
+| Rotation positions, arrows, highlights and notes | **5-1 Rotation Guide → Edit positions** | `rotations.json` |
 | Add a match | **Clip Marker** | the game file, in the `clips` folder |
 
 You can try the rotation editor and Clip Marker on the [demo site](https://kagazzie.github.io/TMT-VolleyballHub/)

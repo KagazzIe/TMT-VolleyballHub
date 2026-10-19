@@ -38,7 +38,7 @@ the pages provide play, seek, speed and volume.
 | Path | File | Notes |
 |---|---|---|
 | `/` | `index.html` | Hub. Shows a demo note when no `team/team.json` exists. |
-| `/rotations/` | `rotations/index.html` | 5-1 rotation guide and its editor (saves or exports `rotations.json`). |
+| `/rotations/` | `rotations/index.html` | 5-1 rotation guide and its editor (saves or exports `rotations.json`). View keys: `rx\|rot` (receive), `sv\|rot\|lib` (serving), `bs\|rot\|lib` (base), `dl\|rot\|lib` / `dr\|rot\|lib` (defense against their left / right side hit, starting from base). Version 3 added the `dl`/`dr` views and per-view `arrows`: `{from, pts}` starts at a player, `{pts, dash: true}` is the ball; drawn as smooth curves through the points. Version 2 files still load. The team defense is three more views, `def\|bs`, `def\|dl`, `def\|dr`, with `pos` (and arrow `from`) keyed by spot (`LF MF RF LB MID RB`) instead of player; every rotation's Defense uses it unless that rotation has its own `pos`. |
 | `/clips/` | `clips/index.html` | Match clip viewer. |
 | `/clips/marker/` | `clips/marker/index.html` | Clip Marker, saves or exports one game JSON. |
 | `/setup/` | `setup/index.html` | Team Setup, a form that saves or downloads `team.json` (`name`, `roster`, `labels`). Team `labels` set Clip Marker's play list and the viewer's filter order; without them the defaults are Serve, Receive, Set, Hit, Block. |
@@ -61,6 +61,8 @@ shared script is `assets/github.js` (Save to GitHub), used by Team Setup, the ro
 Every page links the Google Fonts stylesheet and `assets/theme.css` (relative path), then its own
 `<style>` block. Use the CSS variables below. **Do not hard-code colors** in pages; if a new color
 is needed, add a token to `theme.css` with light and dark values.
+When a page uses a token that's new in `theme.css`, give it a fallback (`var(--arrow,#d4148c)`): GitHub Pages
+caches the stylesheet for about 10 minutes, so right after a release a page can arrive before the new tokens.
 
 The theme follows the device's light/dark setting. Dark mode is the navy look.
 
@@ -76,6 +78,7 @@ The theme follows the device's light/dark setting. Dark mode is the navy look.
 | `--accent` | `#1d6fdc` | `#5b9bff` | Focus rings, links, sliders, checkboxes |
 | `--alert` | `#c0281f` | same | Rule highlights, errors |
 | `--ok` | `#2a9d5c` | same | Confirmation toasts |
+| `--arrow` / `--arrow-halo` | `#d4148c` / `#fffdf6` | `#ff4fb8` / `#0f1624` | Arrows on the court, drawn over a halo so they show on court lines |
 | `--S --OH --MB --OPP --L` | `#e63946 #1d6fdc #2a9d5c #f4a300 #7b5cd6` | same | Player roles (setter, outside, middle, opposite, libero) |
 
 Type and shape:

@@ -29,7 +29,7 @@ svg{display:block;width:100%;height:auto;border-radius:12px;background:var(--car
 .muted{color:var(--muted);font-size:14px}
 .key{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;font-size:14px}
 .key i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:5px;vertical-align:-1px}
-[hidden]{display:none!important}.seg+.seg{margin-top:-4px}
+[hidden]{display:none!important}.gone{visibility:hidden}.seg+.seg{margin-top:-4px}
 svg.editing{touch-action:none}svg.editing .p{cursor:grab}textarea{width:100%;font:12px/1.3 ui-monospace,monospace;background:var(--card);color:var(--ink);border:1px solid var(--chip);border-radius:8px;padding:6px}#warn:empty{display:none}#warn{color:#d6402f;font-weight:600;margin-top:6px}
 .seg button:disabled{opacity:.5;cursor:default}
 #status{margin:0 0 10px}
@@ -48,6 +48,13 @@ svg.editing{touch-action:none}svg.editing .p{cursor:grab}textarea{width:100%;fon
 #hlList{list-style:none;margin:0 0 8px;padding:0}
 #hlList li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0 6px 10px;border-left:3px solid #e5322d;margin-bottom:6px;font-weight:600}
 #hlList li.none{border-left-color:var(--chip);font-weight:400;color:var(--muted)}
+#arList{list-style:none;margin:0 0 8px;padding:0}
+#arList li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0 6px 10px;border-left:3px solid var(--arrow,#d4148c);margin-bottom:6px;font-weight:600}
+#arList li.dash{border-left-style:dashed}
+#arList li.none{border-left-color:var(--chip);font-weight:400;color:var(--muted)}
+#arList button{border:0;background:var(--chip);color:var(--ink);border-radius:8px;min-width:36px;min-height:36px;cursor:pointer}
+#arMsg{font-weight:600;margin:0 0 6px}
+svg.drawing{cursor:crosshair}svg.drawing .p{cursor:pointer}
 #hlList button{border:0;background:var(--chip);color:var(--ink);border-radius:8px;min-width:36px;min-height:36px;cursor:pointer}
 .hladd{display:grid;grid-template-columns:1fr auto 1fr auto;gap:6px}
 .hladd button{font:600 14px Barlow,sans-serif;border:0;border-radius:8px;background:var(--on);color:var(--onink);padding:0 12px;cursor:pointer}
@@ -75,7 +82,8 @@ svg.editing{touch-action:none}svg.editing .p{cursor:grab}textarea{width:100%;fon
 </div>
 <div class="rot" id="rot"><span>Rotation</span></div>
 <svg id="court" viewBox="0 0 300 372" role="img" aria-label="Half court showing player positions"></svg>
-<div class="seg" id="view" style="margin-top:10px"><button data-v="receive" aria-pressed="true">We're receiving</button><button data-v="serving" aria-pressed="false">We're serving</button><button data-v="base" aria-pressed="false">Base position</button></div>
+<div class="seg" id="view" style="margin-top:10px"><button data-v="receive" aria-pressed="true">We're receiving</button><button data-v="serving" aria-pressed="false">We're serving</button><button data-v="base" aria-pressed="false">Defense</button></div>
+<div class="seg" id="hit" hidden aria-label="Where their attack comes from"><button data-h="left" aria-pressed="false">Left side hit</button><button data-h="base" aria-pressed="true">Base</button><button data-h="right" aria-pressed="false">Right side hit</button></div>
 <p class="muted" id="status"></p>
 <div class="seg" id="editRow"><button id="editBtn" aria-pressed="false">Edit positions</button></div>
 <div class="card"><p id="head"></p><p class="muted" id="tip"></p></div>
@@ -96,7 +104,7 @@ svg.editing{touch-action:none}svg.editing .p{cursor:grab}textarea{width:100%;fon
     <h3>Positions</h3>
     <p class="muted" id="editMsg"></p>
     <p id="warn"></p>
-    <div class="seg"><button id="resetPos">Reset positions</button></div>
+    <div class="seg"><button id="ownPos" hidden>Change only this rotation</button><button id="resetPos">Reset positions</button></div>
   </section>
   <section id="libSec">
     <h3>Libero</h3>
@@ -111,6 +119,16 @@ svg.editing{touch-action:none}svg.editing .p{cursor:grab}textarea{width:100%;fon
       <select id="hlRel" aria-label="Must be"><option value="behind">behind</option><option value="front">in front of</option><option value="left">left of</option><option value="right">right of</option></select>
       <select id="hlB" aria-label="Other player"></select>
       <button id="hlAdd">Add</button>
+    </div>
+  </section>
+  <section>
+    <h3>Arrows</h3>
+    <p class="muted">Show where players go, or where the ball goes (dashed).</p>
+    <ul id="arList"></ul>
+    <div class="seg" id="arStart"><button id="arMove">Draw a move</button><button id="arBall">Draw the ball</button></div>
+    <div id="arDraw" hidden>
+      <p id="arMsg"></p>
+      <div class="seg"><button id="arDone" class="pri">Done</button><button id="arUndo">Undo point</button><button id="arCancel">Cancel</button></div>
     </div>
   </section>
   <section>
@@ -148,16 +166,36 @@ const front=s=>s===2||s===3||s===4;
 const nxt=s=>s===1?6:s-1;
 const kind=r=>r.replace(/\d/,'');
 const M=30,V=14;
-let pos=1,view='receive',rot=0,lib='left',edit=false,CUR={},tweenId=0,drag=null,confirmRevert=false;
-// EDITS and TEAM map a view key to {pos, libero, highlights, note}; every field is optional
+// hit: in the base view, where the other team attacks from (their left side, base before the attack, their right side)
+let pos=1,view='receive',rot=0,lib='left',hit='base',edit=false,CUR={},tweenId=0,drag=null,confirmRevert=false;
+// drawing: an arrow being drawn in the editor, {dash, from, pts}
+let drawing=null;
+// EDITS and TEAM map a view key to {pos, libero, highlights, arrows, note}; every field is optional
 // pending: saved to GitHub from this browser, but the site hasn't redeployed with it yet
 let TEAM={},TEAM_T=0,teamState='loading',EDITS={},draft=false,pending=false;
 const slot=(r,n)=>{let s=START[r];for(let i=0;i<n;i++)s=nxt(s);return s};
 function stateKey(){
   if(pos!==1)return null;
-  return view==='receive'?`rx|${rot}`:view==='serving'?`sv|${rot}|${lib}`:`bs|${rot}|${lib}`;
+  if(view==='receive')return `rx|${rot}`;
+  if(view==='serving')return `sv|${rot}|${lib}`;
+  return(hit==='base'?'bs':hit==='left'?'dl':'dr')+`|${rot}|${lib}`;
 }
 const rec=()=>{const k=stateKey();return(k&&EDITS[k])||{}};
+// Team defense: one Base, Left side hit and Right side hit layout for every rotation, stored by court spot
+// (LF, MF, RF at the net; LB, MID, RB in the back) as views def|bs, def|dl and def|dr. Each player takes the
+// spot they play in that rotation (see spot()). A rotation's own positions, if it has them, win.
+const SPOTS=['LF','MF','RF','LB','MID','RB'];
+const SIT={base:'bs',left:'dl',right:'dr'};
+const defKey=()=>'def|'+SIT[hit];
+const isDef=()=>pos===1&&view==='base';
+const teamDef=sit=>EDITS['def|'+(sit||SIT[hit])]||{};
+// Where each player stands in the team defense for this rotation, or null if it isn't set
+function teamDefPos(sit){
+  const d=teamDef(sit).pos;if(!d)return null;
+  const T={};R.forEach(r=>T[r]=[...d[spot(r)]]);return T;
+}
+const usesTeamDef=()=>isDef()&&!rec().pos;
+const playerAt=sp=>R.find(r=>spot(r)===sp);
 // Players the libero may replace: back row, not the setter. In the serving view that includes the
 // server (only if the team chooses it; the default never replaces the server).
 const backRow=()=>R.filter(r=>r!=='S'&&!front(slot(r,rot)));
@@ -167,8 +205,11 @@ function defaultLibero(){
   const mb=['MB1','MB2'].find(r=>!front(slot(r,rot)));
   return view==='serving'&&slot(mb,rot)===1?null:mb;
 }
+// The libero choice (left, middle, none) is for serving and base. Receive layouts always have the libero
+// in (unless the team takes them out for that rotation), so the choice is hidden there.
+const libOn=()=>view==='receive'||lib!=='off';
 function liberoFor(){
-  if(pos!==1||lib==='off')return null;
+  if(pos!==1||!libOn())return null;
   const l=rec().libero;
   if(l==='none')return null;
   return l&&backRow().includes(l)?l:defaultLibero();
@@ -209,14 +250,15 @@ function placeLabels(items,P){
 function hlItems(P){
   return hlRules().map(([a,b,t])=>({A:P[R.find(q=>slot(q,rot)===a)],B:P[R.find(q=>slot(q,rot)===b)],text:`${nameAt(a)} ${PHRASE[t]} ${nameAt(b)}`}));
 }
+// Rule lines and their labels, drawn in two layers: lines under the arrows, labels on top of them
 function hlSvg(P){
   const L=placeLabels(hlItems(P),P);
-  return L.map(l=>`<line x1="${l.A[0]}" y1="${l.A[1]}" x2="${l.B[0]}" y2="${l.B[1]}" stroke="#e5322d" stroke-width="2.5" stroke-dasharray="5 4" stroke-linecap="round"/>`).join('')
-   +L.map(l=>{
+  return[L.map(l=>`<line x1="${l.A[0]}" y1="${l.A[1]}" x2="${l.B[0]}" y2="${l.B[1]}" stroke="#e5322d" stroke-width="2.5" stroke-dasharray="5 4" stroke-linecap="round"/>`).join(''),
+   L.map(l=>{
       const dx=l.B[0]-l.A[0],dy=l.B[1]-l.A[1],len2=dx*dx+dy*dy||1,u=Math.max(0,Math.min(1,((l.cx-l.A[0])*dx+(l.cy-l.A[1])*dy)/len2)),qx=l.A[0]+u*dx,qy=l.A[1]+u*dy;
       const lead=Math.hypot(l.cx-qx,l.cy-qy)>12?`<line x1="${qx}" y1="${qy}" x2="${l.cx}" y2="${l.cy}" stroke="#e5322d" stroke-width="1.2"/>`:'';
       return lead+`<rect x="${l.cx-l.w/2}" y="${l.cy-l.h/2}" width="${l.w}" height="${l.h}" rx="3" fill="#c0281f"/><text x="${l.cx}" y="${l.cy+3.2}" text-anchor="middle" font-size="8.5" font-weight="700" font-family="Barlow,sans-serif" fill="#fff">${l.text}</text>`;
-   }).join('');
+   }).join('')];
 }
 // Which base spot a player covers: LF/MF/RF at the net, LB/MID/RB in the back
 function spot(r){
@@ -278,7 +320,13 @@ function plain(){const T={};R.forEach(r=>{const s=slot(r,rot);T[r]=[SX[s],front(
 // With no team positions, every view shows plain rotation order. If the team set a base
 // for this rotation, serving starts from it and obeys the overlap rules.
 function defaults(){
-  const b=pos===1&&view==='serving'&&EDITS[`bs|${rot}|${lib}`],B=b&&b.pos;
+  const base=pos===1&&EDITS[`bs|${rot}|${lib}`];
+  if(isDef()){
+    const t=teamDefPos();if(t)return t;
+    if(hit!=='base')return base&&base.pos?clone(base.pos):(teamDefPos('bs')||plain());
+    return plain();
+  }
+  const b=view==='serving'&&base,B=(b&&b.pos)||(view==='serving'&&teamDefPos('bs'));
   if(!B)return plain();
   const T={};R.forEach(r=>T[r]=slot(r,rot)===1?[235,348]:[...B[r]]);
   return solve(T,true);
@@ -294,29 +342,48 @@ function issues(P){
 }
 // Team file and local drafts. Version 2 stores a record per view; version 1 files
 // (positions only, plus a separate notes map) are still read.
-const KEY_RX=/^(rx\|[0-5]|(sv|bs)\|[0-5]\|(left|mid|off))$/;
+const KEY_RX=/^(rx\|[0-5]|(sv|bs|dl|dr)\|[0-5]\|(left|mid|off)|def\|(bs|dl|dr))$/;
 const REL=Object.keys(PHRASE);
-const okPos=p=>!!p&&R.every(r=>Array.isArray(p[r])&&p[r].length===2&&p[r].every(Number.isFinite));
+// Positions are keyed by player, or by spot in the team defense views
+const keysFor=k=>k&&k.startsWith('def|')?SPOTS:R;
+const okPos=(p,keys=R)=>!!p&&keys.every(r=>Array.isArray(p[r])&&p[r].length===2&&p[r].every(Number.isFinite));
+const clonePos=(P,keys)=>{const o={};keys.forEach(r=>o[r]=[P[r][0],P[r][1]]);return o};
 const okNote=s=>typeof s==='string'&&s.trim()?s.trim().slice(0,800):'';
-function cleanRec(v){
+// Arrows: {from, pts} starts at a player and follows the points; {pts, dash} with no player is the ball.
+// Points are court units, like positions. A move needs one point, the ball needs two.
+const okPt=q=>Array.isArray(q)&&q.length===2&&q.every(Number.isFinite);
+function okArrow(a,keys=R){
+  if(!a||typeof a!=='object'||!Array.isArray(a.pts))return null;
+  const pts=a.pts.filter(okPt).slice(0,10).map(([x,y])=>[Math.round(Math.min(296,Math.max(4,x))),Math.round(Math.min(368,Math.max(4,y)))]);
+  const from=keys.includes(a.from)?a.from:null;
+  if(pts.length<(from?1:2))return null;
+  const o={};if(from)o.from=from;o.pts=pts;if(a.dash)o.dash=true;
+  return o;
+}
+function cleanRec(v,k){
   const o={};if(!v||typeof v!=='object')return o;
-  if(okPos(v.pos))o.pos=clone(v.pos);
+  const keys=keysFor(k);
+  if(okPos(v.pos,keys))o.pos=clonePos(v.pos,keys);
+  if(keys!==R){const a=Array.isArray(v.arrows)?v.arrows.map(x=>okArrow(x,keys)).filter(Boolean).slice(0,12):[];if(a.length)o.arrows=a;return o}
   if(v.libero==='none'||(typeof v.libero==='string'&&v.libero!=='S'&&R.includes(v.libero)))o.libero=v.libero;
   if(Array.isArray(v.highlights)){
     const h=v.highlights.filter(x=>Array.isArray(x)&&x.length===3&&Number.isInteger(x[0])&&Number.isInteger(x[1])&&x[0]>=1&&x[0]<=6&&x[1]>=1&&x[1]<=6&&x[0]!==x[1]&&REL.includes(x[2])).map(x=>[x[0],x[1],x[2]]);
     if(h.length)o.highlights=h;
   }
+  if(Array.isArray(v.arrows)){
+    const a=v.arrows.map(x=>okArrow(x)).filter(Boolean).slice(0,12);
+    if(a.length)o.arrows=a;
+  }
   const n=okNote(v.note);if(n)o.note=n;
   return o;
 }
-function norm(v){const o={},c=cleanRec(v||{});['pos','libero','highlights','note'].forEach(f=>{if(c[f]!==undefined)o[f]=c[f]});return o}
-const sameRec=(a,b)=>JSON.stringify(norm(a))===JSON.stringify(norm(b));
+function norm(v,k){const o={},c=cleanRec(v||{},k);['pos','libero','highlights','arrows','note'].forEach(f=>{if(c[f]!==undefined)o[f]=c[f]});return o}
 function readFile(d){
   if(!d||d.format!=='tmt-rotations'||!d.views||typeof d.views!=='object')return null;
   const views={};
   for(const[k,v]of Object.entries(d.views)){
     if(!KEY_RX.test(k))continue;
-    const r=okPos(v)?{pos:clone(v)}:cleanRec(v);
+    const r=!k.startsWith('def|')&&okPos(v)?{pos:clone(v)}:cleanRec(v,k);
     if(Object.keys(r).length)views[k]=r;
   }
   if(d.notes&&typeof d.notes==='object')for(const[k,s]of Object.entries(d.notes)){
@@ -331,7 +398,7 @@ function saveDraft(){draft=true;pending=false;lsSet(LS,{format:'tmt-rotations',v
 function setRec(k,fn){
   if(!k)return;
   const r=Object.assign({},EDITS[k]);fn(r);
-  const c=norm(r);
+  const c=norm(r,k);
   if(Object.keys(c).length)EDITS[k]=c;else delete EDITS[k];
   saveDraft();
 }
@@ -348,18 +415,22 @@ async function loadTeam(){
 }
 function exportText(t){
   const ks=Object.keys(EDITS).sort();
-  return '{\n  "format": "tmt-rotations",\n  "version": 2,\n  "updated": '+(t||Date.now())+',\n  "views": {'+ks.map(k=>'\n    '+JSON.stringify(k)+': '+JSON.stringify(norm(EDITS[k]))).join(',')+'\n  }\n}\n';
+  return '{\n  "format": "tmt-rotations",\n  "version": 3,\n  "updated": '+(t||Date.now())+',\n  "views": {'+ks.map(k=>'\n    '+JSON.stringify(k)+': '+JSON.stringify(norm(EDITS[k],k))).join(',')+'\n  }\n}\n';
 }
 function moveTo(r,x,y){
   CUR[r]=[Math.round(Math.min(286,Math.max(14,x))),Math.round(Math.min(358,Math.max(14,y)))];
   draw(CUR);showWarn(CUR);
 }
-function commit(){setRec(stateKey(),r=>{r.pos=clone(CUR)});updateUI(CUR)}
+function commit(){
+  if(usesTeamDef()){const P={};R.forEach(r=>P[spot(r)]=CUR[r]);setRec(defKey(),d=>{d.pos=P})}
+  else setRec(stateKey(),r=>{r.pos=clone(CUR)});
+  updateUI(CUR);
+}
 function resetView(){const k=stateKey();if(k&&EDITS[k]){delete EDITS[k];saveDraft()}render()}
 function revert(){EDITS=deep(TEAM);draft=false;if(!pending)lsSet(LS,null);render()}
 // Drawing
 const svg=document.getElementById('court');
-let h='<defs><clipPath id="cc"><rect x="20" y="20" width="260" height="310"/></clipPath><filter id="bl" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="2.5"/></filter></defs>';
+let h='<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto"><path d="M1 1L9.5 5L1 9z" fill="var(--arrow,#d4148c)" stroke="var(--arrow-halo,#fffdf6)" stroke-width="1.2" stroke-linejoin="round"/></marker><clipPath id="cc"><rect x="20" y="20" width="260" height="310"/></clipPath><filter id="bl" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="2.5"/></filter></defs>';
 h+='<rect x="20" y="20" width="260" height="310" rx="4" fill="var(--court)"/><g clip-path="url(#cc)"><g id="zones" filter="url(#bl)">'+R.map(r=>`<path id="z-${r}" fill-opacity=".3"/>`).join('')+'</g></g>';
 h+='<line x1="20" y1="123" x2="280" y2="123" stroke="var(--line)" stroke-width="2.5" opacity=".7"/>';
 h+='<rect x="20" y="20" width="260" height="310" fill="none" stroke="var(--line)" stroke-width="3"/>';
@@ -367,7 +438,7 @@ h+='<rect x="12" y="12" width="276" height="8" rx="3" fill="var(--ink)"/>';
 NUMS.forEach(([n,x,y])=>{
   h+=`<text x="${x}" y="${y}" text-anchor="middle" font-size="22" font-weight="700" fill="var(--line)" opacity=".4" font-family="Barlow Condensed,sans-serif">${n}</text>`;
 });
-h+='<g id="hl"></g>';
+h+='<g id="hl"></g><g id="arw"></g><g id="hlt"></g>';
 R.forEach(r=>{h+=`<g class="p" id="p-${r}"><circle r="15" stroke="var(--line)" stroke-width="2.5"/><text text-anchor="middle" y="4" font-weight="700" font-family="Barlow Condensed,sans-serif"></text></g>`});
 svg.innerHTML=h;
 const col=k=>`var(--${k})`;
@@ -380,9 +451,31 @@ function setLabels(){
     document.getElementById('z-'+r).setAttribute('fill',col(k));
   });
 }
+// A smooth curve through the points (Catmull-Rom spline as cubic Beziers), ending in an arrowhead
+function curve(pts){
+  let d=`M${pts[0][0]} ${pts[0][1]}`;
+  for(let i=0;i<pts.length-1;i++){
+    const p0=pts[i-1]||pts[i],p1=pts[i],p2=pts[i+1],p3=pts[i+2]||p2,f=n=>Math.round(n*10)/10;
+    d+=`C${f(p1[0]+(p2[0]-p0[0])/6)} ${f(p1[1]+(p2[1]-p0[1])/6)} ${f(p2[0]-(p3[0]-p1[0])/6)} ${f(p2[1]-(p3[1]-p1[1])/6)} ${p2[0]} ${p2[1]}`;
+  }
+  return d;
+}
+function arrowSvg(P){
+  if(pos!==1)return'';
+  const team=isDef()?(teamDef().arrows||[]).map(a=>a.from?{...a,from:playerAt(a.from)}:a):[];
+  const list=[...team,...(rec().arrows||[])];if(drawing)list.push({...drawing,live:true});
+  return list.map(a=>{
+    const pts=(a.from?[P[a.from].map(Math.round)]:[]).concat(a.pts);
+    if(pts.length<2)return'';
+    const d=curve(pts),dash=a.dash?' stroke-dasharray="6 5"':'';
+    return `<g${a.live?' opacity=".55"':''}><path d="${d}" fill="none" stroke="var(--arrow-halo,#fffdf6)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"${dash} opacity=".85"/><path d="${d}" fill="none" stroke="var(--arrow,#d4148c)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"${dash} marker-end="url(#ah)"/></g>`;
+  }).join('');
+}
 function draw(P){
   R.forEach(r=>{document.getElementById('p-'+r).style.transform=`translate(${P[r][0]}px,${P[r][1]}px)`});
-  document.getElementById('hl').innerHTML=hlSvg(P);
+  const[hlLines,hlLabels]=hlSvg(P);
+  document.getElementById('hl').innerHTML=hlLines;document.getElementById('hlt').innerHTML=hlLabels;
+  document.getElementById('arw').innerHTML=arrowSvg(P);
   const z=showZones();
   document.getElementById('zones').style.display=z?'':'none';
   if(z){
@@ -404,7 +497,9 @@ function tween(T){
 function showWarn(P){document.getElementById('warn').textContent=edit?issues(P).join('. '):''}
 function fmtDate(t){try{return new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}catch(e){return''}}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const VIEWNAME={receive:"We're receiving",serving:"We're serving",base:'Base position'};
+const VIEWNAME={receive:"We're receiving",serving:"We're serving",base:'Defense'};
+const HITNAME={base:'base',left:'their left side hit',right:'their right side hit'};
+const viewName=()=>VIEWNAME[view]+(view==='base'?' · '+HITNAME[hit]:'');
 let panelKey=null;
 function fillSelect(el,opts,keep){
   const prev=el.value;
@@ -416,13 +511,22 @@ function updatePanel(){
   $('editPanel').hidden=!show;document.body.classList.toggle('editing',show);
   if(!show)return;
   const k=stateKey(),r=rec(),t=TEAM[k]||{},changed=panelKey!==k;panelKey=k;
-  $('ctx').textContent=`Rotation ${rot+1} · ${VIEWNAME[view]} · ${lib==='off'?'no libero':'libero '+(lib==='left'?'left':'middle')}`+(view==='receive'?'. Receive layouts are shared by all libero settings.':'.');
+  $('ctx').textContent=`Rotation ${rot+1} · ${viewName()}`+(view==='receive'?'.':` · ${lib==='off'?'no libero':'libero '+(lib==='left'?'left':'middle')}.`);
   const src=!r.pos?'default (plain rotation order)':(t.pos&&JSON.stringify(clone(r.pos))===JSON.stringify(clone(t.pos)))?'from the team file':'edited in this browser';
-  $('editMsg').textContent=`Drag players on the court to move them. Positions: ${src}.`;
-  $('resetPos').disabled=!r.pos;
+  if(isDef()){
+    const td=teamDef().pos;
+    $('editMsg').textContent=r.pos?'This rotation has its own positions, so the team defense doesn\'t apply here. Drag players to change this rotation only.'
+      :`Drag players to set the team defense. It applies to every rotation: each player takes the spot they play (left, middle or right, at the net or in the back).`+(td?'':' Not set yet, so it starts from '+(hit==='base'?'plain rotation order.':'Base.'));
+    $('ownPos').hidden=!!r.pos;
+    $('resetPos').textContent=r.pos?'Use the team defense':'Reset the team defense';
+    $('resetPos').disabled=!r.pos&&!td;
+  }else{
+    $('editMsg').textContent=`Drag players on the court to move them. Positions: ${src}.`;
+    $('ownPos').hidden=true;$('resetPos').textContent='Reset positions';$('resetPos').disabled=!r.pos;
+  }
   // Libero
-  $('libSec').hidden=lib==='off';
-  if(lib!=='off'){
+  $('libSec').hidden=!libOn();
+  if(libOn()){
     const d=defaultLibero()||'none';
     fillSelect($('libSel'),[...backRow().map(p=>[p,p+(isServer(p)?' (serving)':'')]),['none','Nobody (libero is out)']].map(([v,l])=>[v,l+(v===d?' (default)':'')]));
     $('libSel').value=liberoFor()||'none';
@@ -433,6 +537,16 @@ function updatePanel(){
   const slots=[1,2,3,4,5,6].map(s=>[s,`${nameAt(s)} (${s})`]);
   fillSelect($('hlA'),slots,!changed);fillSelect($('hlB'),slots,!changed);
   if(changed){$('hlA').value='1';$('hlB').value='2'}
+  // Arrows
+  const who=a=>a.from?(isL(a.from)?'L':a.from)+' moves':'The ball';
+  const TA=isDef()?(teamDef().arrows||[]).map((a,i)=>({a:a.from?{...a,from:playerAt(a.from)}:a,i,s:'t'})):[];
+  const A=[...TA,...(r.arrows||[]).map((a,i)=>({a,i,s:'r'}))];
+  $('arList').innerHTML=A.length?A.map(({a,i,s})=>`<li class="${a.dash?'dash':''}"><span>${esc(who(a))}${isDef()?(s==='t'?' <span class="muted">(team defense)</span>':' <span class="muted">(this rotation)</span>'):''}</span><button data-i="${i}" data-s="${s}" aria-label="Remove arrow">&#x2715;</button></li>`).join(''):'<li class="none">No arrows in this view.</li>';
+  $('arStart').hidden=!!drawing;$('arDraw').hidden=!drawing;
+  if(drawing){
+    $('arMsg').textContent=!drawing.dash&&!drawing.from?'Tap the player who moves.':(drawing.pts.length?'Keep tapping to bend the path, then tap Done.':drawing.dash?'Tap where the ball starts.':'Tap where they go. Tap more points to bend the path.');
+    $('arDone').disabled=drawing.pts.length<(drawing.dash?2:1);$('arUndo').disabled=!drawing.pts.length&&!drawing.from;
+  }
   // Note
   const nt=$('noteText');if(changed||document.activeElement!==nt)nt.value=r.note||'';
   // Team file
@@ -449,14 +563,22 @@ function updateUI(P){
   const dflt=' These are default positions in plain rotation order. Use Edit positions to set your own.';
   if(pos!==1)t='Plain rotation order with no positional play. Everyone stands where the rotation puts them. Compare this with 5-1 positioning.';
   else if(view==='receive')t=note||('Where everyone stands while the other team serves.'+(own?'':dflt));
-  else if(view==='serving'){const b=EDITS[`bs|${rot}|${lib}`],fromBase=!own&&b&&b.pos;t=note||(own?'Where everyone stands while we serve. The server stands behind the end line.':fromBase?'Everyone starts as close to their base position as the overlap rules allow. The server stands behind the end line.':'Where everyone stands while we serve.'+dflt+' Setting a base position also fills this in.')}
-  else t=(note||'Where everyone sets up once the ball crosses the net. Shaded areas are dig zones.'+(own?'':dflt))+(sBack()?'':' The setter is in the front row, so the opposite plays right back.');
+  else if(view==='serving'){const b=EDITS[`bs|${rot}|${lib}`],fromBase=!own&&b&&b.pos;t=note||(own?'Where everyone stands while we serve. The server stands behind the end line.':fromBase?'Everyone starts as close to their Defense base spot as the overlap rules allow. The server stands behind the end line.':'Where everyone stands while we serve.'+dflt+' Setting Defense → Base also fills this in.')}
+  else{
+    const td=teamDef().pos,from=own?'':td?' Team defense: the same in every rotation.':hit!=='base'?' These start from Base. Use Edit positions to set your own.':dflt;
+    if(hit!=='base')t=(note||(hit==='left'?"Defense when their left side hitter attacks, which comes at our right side.":"Defense when their right side hitter attacks, which comes at our left side.")+' Shaded areas are dig zones.')+from;
+    else t=(note||'Base: where everyone sets up once the ball crosses the net, before their attack. Shaded areas are dig zones.')+from+(sBack()?'':' The setter is in the front row, so the opposite plays right back.');
+  }
   if(hlRules().length)t+=' Key rules: '+hlText().join(', ')+'.';
   $('tip').textContent=t;
   on('#rot button',b=>+b.dataset.i===rot);on('#view button',b=>b.dataset.v===view);on('#sys button',b=>+b.dataset.s===pos);
   on('#lib button',b=>b.dataset.l===lib);on('#editBtn',()=>edit);
   const k=stateKey(),p=pos===1;
-  ['libWrap','view','editRow'].forEach(i=>$(i).hidden=!p);
+  ['view','editRow'].forEach(i=>$(i).hidden=!p);
+  svg.classList.toggle('drawing',!!drawing);
+  $('hit').hidden=!(p&&view==='base');on('#hit button',b=>b.dataset.h===hit);
+  // Hide the libero choice without removing its space, so the court doesn't jump
+  const lw=$('libWrap'),lo=p&&view!=='receive';lw.classList.toggle('gone',!lo);lw.inert=!lo;
   $('serveNote').hidden=p&&view==='base';$('baseNote').hidden=!(p&&view==='base');
   svg.classList.toggle('editing',edit&&!!k);
   $('status').textContent=pending?'Showing the positions you saved to GitHub. Your site updates in about two minutes.':draft?'Showing your local edits, which are not in the team file yet.'+(edit?'':TMTGitHub.repo?' Open Edit positions to save them.':' Open Edit positions to export them.'):teamState==='missing'?'No team positions are published yet, so these are default positions.':teamState==='invalid'?'The team positions file could not be read, so these are default positions.':'';
@@ -474,16 +596,47 @@ function render(){
 const rotEl=document.getElementById('rot');
 for(let i=0;i<6;i++){const b=document.createElement('button');b.textContent='R'+(i+1);b.dataset.i=i;b.setAttribute('aria-label','Rotation '+(i+1));b.onclick=()=>{rot=i;confirmRevert=false;render()};rotEl.appendChild(b)}
 const wire=(sel,fn)=>document.querySelectorAll(sel).forEach(b=>b.onclick=()=>{fn(b);confirmRevert=false;render()});
-wire('#sys button',b=>{pos=+b.dataset.s;if(!pos)edit=false});wire('#view button',b=>view=b.dataset.v);wire('#lib button',b=>lib=b.dataset.l);
+wire('#sys button',b=>{pos=+b.dataset.s;if(!pos)edit=false});wire('#view button',b=>view=b.dataset.v);wire('#lib button',b=>lib=b.dataset.l);wire('#hit button',b=>hit=b.dataset.h);
+// Changing what's shown, or closing the editor, drops an arrow that isn't finished
+document.querySelectorAll('#sys button,#view button,#lib button,#hit button,#rot button').forEach(b=>b.addEventListener('click',()=>{if(drawing){drawing=null;render()}},true));
 const $=id=>document.getElementById(id);
 $('editBtn').onclick=()=>{
-  edit=!edit;confirmRevert=false;$('exp').hidden=true;render();
+  edit=!edit;drawing=null;confirmRevert=false;$('exp').hidden=true;render();
   // On phones the editor is a bottom sheet: bring the court to the top so it stays draggable
   if(edit&&matchMedia('(max-width:899px)').matches)svg.scrollIntoView({block:'start',behavior:'smooth'});
 };
-$('editClose').onclick=()=>{edit=false;confirmRevert=false;render();$('editBtn').focus()};
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&edit){edit=false;render()}});
-$('resetPos').onclick=()=>{setRec(stateKey(),r=>{delete r.pos});render()};
+$('editClose').onclick=()=>{edit=false;drawing=null;confirmRevert=false;render();$('editBtn').focus()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&drawing){drawing=null;render()}else if(e.key==='Escape'&&edit){edit=false;render()}});
+// On phones the editor is a bottom sheet: show its drawing buttons, and bring the court to the top
+function startDrawing(dash){
+  drawing={dash,from:null,pts:[]};render();
+  const ed=$('editPanel'),ad=$('arDraw');ed.scrollTop=Math.max(ed.scrollTop,ad.offsetTop+ad.offsetHeight-ed.clientHeight+16);
+  if(matchMedia('(max-width:899px)').matches)svg.scrollIntoView({block:'start',behavior:'smooth'});
+}
+$('arMove').onclick=()=>startDrawing(false);
+$('arBall').onclick=()=>startDrawing(true);
+$('arCancel').onclick=()=>{drawing=null;render()};
+$('arUndo').onclick=()=>{if(!drawing)return;if(drawing.pts.length)drawing.pts.pop();else drawing.from=null;render()};
+$('arDone').onclick=()=>{
+  const a=drawing&&okArrow(drawing);drawing=null;
+  // While a rotation uses the team defense, new arrows go to the team defense, by spot
+  if(a&&usesTeamDef()){if(a.from)a.from=spot(a.from);setRec(defKey(),d=>{d.arrows=[...(d.arrows||[]),a]})}
+  else if(a)setRec(stateKey(),r=>{r.arrows=[...(r.arrows||[]),a]});
+  render();
+};
+$('arList').onclick=e=>{
+  const btn=e.target.closest('button[data-i]');if(!btn)return;const i=+btn.dataset.i;
+  setRec(btn.dataset.s==='t'?defKey():stateKey(),r=>{r.arrows=(r.arrows||[]).filter((x,j)=>j!==i)});render();
+};
+$('resetPos').onclick=()=>{
+  if(usesTeamDef()){
+    if(!confirm('Reset the team defense for '+HITNAME[hit]+'? This changes every rotation that uses it.'))return;
+    setRec(defKey(),d=>{delete d.pos});
+  }else setRec(stateKey(),r=>{delete r.pos});
+  render();
+};
+// Give this rotation its own copy of the positions, so changes here don't touch the team defense
+$('ownPos').onclick=()=>{setRec(stateKey(),r=>{r.pos=clone(target())});render()};
 $('resetView').onclick=()=>{confirmRevert=false;resetView()};
 $('revert').onclick=()=>{if(confirmRevert){confirmRevert=false;revert()}else{confirmRevert=true;updateUI()}};
 $('libSel').onchange=e=>{const v=e.target.value;setRec(stateKey(),r=>{if(v===(defaultLibero()||'none'))delete r.libero;else r.libero=v});render()};
@@ -544,6 +697,13 @@ function svgPt(e){
 }
 svg.addEventListener('pointerdown',e=>{
   if(!edit||!stateKey())return;
+  if(drawing){
+    e.preventDefault();
+    const g=e.target.closest&&e.target.closest('g.p');
+    if(!drawing.dash&&!drawing.from){if(g){drawing.from=g.id.slice(2);render()}return}
+    const pt=svgPt(e);drawing.pts.push([Math.round(Math.min(296,Math.max(4,pt.x))),Math.round(Math.min(368,Math.max(4,pt.y)))]);
+    updatePanel();draw(CUR);return;
+  }
   const g=e.target.closest&&e.target.closest('g.p');if(!g)return;
   const r=g.id.slice(2),pt=svgPt(e);
   tweenId++;CUR=target();draw(CUR);

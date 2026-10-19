@@ -156,7 +156,7 @@ await check('rotations team', '/team/rotations/', async p => {
   expect(await p.isVisible('#editPanel'), 'editor should open');
   await p.click('#exportBtn');
   const out = JSON.parse(await p.inputValue('#expText'));
-  expect(out.format === 'tmt-rotations' && out.version === 2 && out.views['rx|0'], 'export should be a v2 rotations file');
+  expect(out.format === 'tmt-rotations' && out.version === 3 && out.views['rx|0'], 'export should be a v3 rotations file');
 });
 await check('rotations demo', '/demo/rotations/', async p => {
   const s = await p.evaluate(() => { const T = target(); pos = 0; const P = target(); pos = 1; return { same: JSON.stringify(T) === JSON.stringify(P), hl: hlText().length }; });
@@ -178,6 +178,65 @@ await check('rotations demo', '/demo/rotations/', async p => {
   expect(lib.after === 'MB2' && lib.head.includes('Libero replaces MB2'), `choosing the server should work, got ${JSON.stringify(lib)}`);
   // Drafts are per site: an edit on the demo must not show on the team site
   await p.click('#editBtn'); await p.fill('#noteText', 'demo only'); await p.waitForTimeout(500);
+});
+await check('rotations libero choice, hitting views and arrows', '/team/rotations/', async p => {
+  const top = () => p.evaluate(() => Math.round(document.getElementById('court').getBoundingClientRect().top + scrollY));
+  const libShown = () => p.evaluate(() => getComputedStyle(document.getElementById('libWrap')).visibility === 'visible');
+  const t0 = await top();
+  expect(!(await libShown()), 'libero choice should be hidden while receiving');
+  await p.click('#view [data-v="serving"]');
+  expect(await libShown(), 'libero choice should show while serving');
+  await p.click('#sys [data-s="0"]');
+  expect(!(await libShown()) && await top() === t0, 'non-positional should hide the libero choice without moving the court');
+  await p.click('#sys [data-s="1"]'); await p.click('#view [data-v="receive"]');
+  expect(await top() === t0, 'court should not move between views');
+  // Hitting views: only in the base view, and they start from the base position
+  expect(!(await p.isVisible('#hit')), 'hit buttons only belong to the base view');
+  await p.click('#view [data-v="base"]');
+  expect(await p.isVisible('#hit'), 'hit buttons should show in the base view');
+  await p.click('#hit [data-h="left"]');
+  const h = await p.evaluate(() => ({ key: stateKey(), same: JSON.stringify(target()) === JSON.stringify(EDITS['bs|0|left'].pos) }));
+  expect(h.key === 'dl|0|left' && h.same, `left side hit should start from base, got ${JSON.stringify(h)}`);
+  // Draw an arrow: tap a player, then two points
+  await p.click('#editBtn'); await p.click('#arMove'); await p.$eval('#court', e => e.scrollIntoView());
+  const at = (x, y) => p.evaluate(([x, y]) => { const s = document.getElementById('court'), q = s.createSVGPoint(); q.x = x; q.y = y; const r = q.matrixTransform(s.getScreenCTM()); return [r.x, r.y]; }, [x, y]);
+  const tap = async (x, y) => { const [cx, cy] = await at(x, y); await p.mouse.click(cx, cy); };
+  const oh1 = await p.evaluate(() => CUR.OH1);
+  expect(await p.isDisabled('#arDone'), 'Done needs a point first');
+  await tap(oh1[0], oh1[1]); await tap(150, 200); await tap(200, 150);
+  await p.click('#arDone');
+  // This rotation uses the team defense, so the arrow goes there, by spot (OH1 plays left front)
+  const a = await p.evaluate(() => ({ arrows: (EDITS['def|dl'] || {}).arrows, own: rec().arrows, paths: document.querySelectorAll('#arw > g').length }));
+  expect(a.arrows && a.arrows.length === 1 && a.arrows[0].from === 'LF' && a.arrows[0].pts.length === 2 && !a.own && a.paths === 1, `arrow should be saved to the team defense and drawn, got ${JSON.stringify(a)}`);
+  await p.click('#arBall'); await tap(270, 10);
+  expect(await p.isDisabled('#arDone'), 'a ball arrow needs two points');
+  await p.click('#arCancel');
+  // Team defense: positions set in one rotation apply to every rotation, by spot
+  const t = await p.evaluate(() => {
+    CUR = target(); CUR.OH1 = [100, 100]; commit();
+    const set = EDITS['def|dl'] && EDITS['def|dl'].pos;
+    rot = 1; render(); const r1 = target(), arrowFrom = document.querySelectorAll('#arw > g').length;
+    rot = 0; render();
+    return { lf: set && set.LF, oh2: r1.OH2, arrowFrom, ownBefore: !!rec().pos };
+  });
+  expect(JSON.stringify(t.lf) === '[100,100]' && JSON.stringify(t.oh2) === '[100,100]' && t.arrowFrom === 1 && !t.ownBefore,
+    `team defense should follow each player's spot in every rotation, got ${JSON.stringify(t)}`);
+  // "Change only this rotation" gives it its own copy; later drags leave the team defense alone
+  await p.click('#ownPos');
+  const o = await p.evaluate(() => { CUR = target(); CUR.OH1 = [120, 90]; commit(); return { own: rec().pos.OH1, team: EDITS['def|dl'].pos.LF }; });
+  expect(JSON.stringify(o.own) === '[120,90]' && JSON.stringify(o.team) === '[100,100]', `rotation copy should be separate, got ${JSON.stringify(o)}`);
+  expect((await p.textContent('#resetPos')) === 'Use the team defense', 'a rotation with its own positions can go back to the team defense');
+  await p.click('#resetPos');
+  expect(await p.evaluate(() => !rec().pos), 'Use the team defense should drop the rotation copy');
+  await p.click('#exportBtn');
+  const out = JSON.parse(await p.inputValue('#expText'));
+  expect(out.version === 3 && out.views['def|dl'].arrows[0].from === 'LF' && out.views['def|dl'].pos.LF[0] === 100, 'export should include the team defense and its arrow');
+  const bad = await p.evaluate(() => readFile({ format: 'tmt-rotations', views: { 'def|dl': { pos: { LF: [1, 2] } }, 'def|xx': { pos: {} } } }).views);
+  expect(Object.keys(bad).length === 0, `incomplete team defense entries should be dropped, got ${JSON.stringify(bad)}`);
+  // Reading: bad arrows are dropped, old files still load
+  const r = await p.evaluate(() => readFile({ format: 'tmt-rotations', version: 3, views: { 'dr|1|mid': { arrows: [{ from: 'OH1', pts: [[10, 10]] }, { pts: [[5, 5]], dash: true }, { from: 'X', pts: [[1, 1]] }] } } }));
+  expect(r.views['dr|1|mid'].arrows.length === 1, `invalid arrows should be dropped, got ${JSON.stringify(r)}`);
+  await p.evaluate(() => { revert(); });
 });
 await check('rotations team after demo edit', '/team/rotations/', async p => {
   expect(await p.evaluate(() => !draft && rec().note === 'Sample receive note.'), 'demo edits leaked into the team site');
