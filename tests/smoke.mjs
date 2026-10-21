@@ -137,6 +137,19 @@ await check('clips: games from one video sort by where they start', '/team/clips
   // Same video: by first clip (B before A, C before 0). Videos on the same day: by their first game name ('Match 0' < 'Match A')
   expect(order.old === 'g3,g0,g2,g1' && order.neu === 'g1,g2,g0,g3', `unexpected game order ${JSON.stringify(order)}`);
 });
+await check('clips warm up to HD before the first clip', '/team/clips/', async p => {
+  await p.evaluate(() => { window.__ytQuality = 'medium'; });
+  await p.click('#list .clip'); await p.waitForTimeout(300);
+  const c = await p.evaluate(() => ({ start: cur.start }));
+  let s = await p.evaluate(() => { const q = __yt.players.at(-1); return { cover: !document.getElementById('warm').hidden, muted: q.muted, t: q.t }; });
+  expect(s.cover && s.muted && s.t <= c.start - 1, `a player below HD should warm up before the clip, muted and covered, got ${JSON.stringify(s)}`);
+  await p.evaluate(() => { __yt.players.at(-1).q = 'hd1080'; }); await p.waitForTimeout(300);
+  s = await p.evaluate(() => { const q = __yt.players.at(-1); return { cover: !document.getElementById('warm').hidden, muted: q.muted, t: q.t, state: q.state }; });
+  expect(!s.cover && !s.muted && s.t === c.start && s.state === 1, `once in HD it should play the clip from its start, got ${JSON.stringify(s)}`);
+  // The next clip plays right away
+  await p.click('#next'); await p.waitForTimeout(150);
+  expect(await p.evaluate(() => document.getElementById('warm').hidden && __yt.players.at(-1).t === cur.start), 'later clips should not warm up again');
+});
 await check('clips volume and video quality', '/team/clips/', async p => {
   await p.click('#list .clip'); await p.waitForTimeout(150);
   const yt = () => p.evaluate(() => { const q = __yt.players.at(-1); return { vol: q.vol, muted: q.muted, controls: q.opts.playerVars.controls }; });

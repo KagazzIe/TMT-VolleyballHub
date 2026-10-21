@@ -11,6 +11,7 @@ window.YT = {
       seekTo(t) { this.t = t }, getCurrentTime() { return this.t }, getDuration() { return 3600 },
       loadVideoById(o) { this.t = (o && o.startSeconds) || 0; this.state = 1 },
       setPlaybackRate(r) { this.rate = r }, getPlaybackRate() { return this.rate },
+      q: window.__ytQuality || 'hd1080', getPlaybackQuality() { return this.q }, getAvailableQualityLevels() { return ['hd1080', 'hd720', 'large', 'auto'] },
       destroy() { const d = document.createElement('div'); d.id = id; frame.replaceWith(d); this.destroyed = true }
     };
     window.__yt.players.push(p);
