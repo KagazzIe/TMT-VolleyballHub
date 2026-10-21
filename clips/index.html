@@ -158,7 +158,9 @@ function ingest(d){
   const vid=g.videoId||m.videoId;if(!vid)return false;
   const name=g.name||m.title||'Untitled game',date=g.date||m.date||'';
   const gid=g.id||('legacy-'+vid+'-'+(date||name));
-  GAMES[gid]={id:gid,name,date,vid};
+  // first: when the game's first clip starts, to order several games cut from one video
+  const starts=d.clips.map(c=>+c.start).filter(Number.isFinite);
+  GAMES[gid]={id:gid,name,date,vid,first:starts.length?Math.min(...starts):Infinity};
   (d.roster||[]).forEach(n=>{if(!ROSTER.includes(n))ROSTER.push(n)});
   CLIPS=CLIPS.filter(c=>c.gid!==gid);
   d.clips.forEach(c=>{
@@ -170,10 +172,16 @@ function ingest(d){
 }
 function sortAll(){
   const dir=F.order==='new'?-1:1,num=new Intl.Collator(undefined,{numeric:true});
+  // On one date, games cut from the same video stay together in the order they happen in it.
+  // Different videos on that date go by the first name among their games.
+  const vkey=g=>g.date+'|'+g.vid,first={};
+  Object.values(GAMES).forEach(g=>{const k=vkey(g);if(!(k in first)||num.compare(g.name,first[k])<0)first[k]=g.name});
   GAME_ORDER=Object.keys(GAMES).sort((a,b)=>{
-    const da=GAMES[a].date,db=GAMES[b].date;
+    const A=GAMES[a],B=GAMES[b],da=A.date,db=B.date;
     if(da!==db){if(!da)return 1;if(!db)return -1;return da<db?-dir:dir}
-    return dir*num.compare(GAMES[a].name,GAMES[b].name);
+    if(A.vid!==B.vid)return dir*(num.compare(first[vkey(A)],first[vkey(B)])||(A.vid<B.vid?-1:1));
+    if(A.first!==B.first)return dir*(A.first<B.first?-1:1);
+    return dir*num.compare(A.name,B.name);
   });
   CLIPS.sort((a,b)=>GAME_ORDER.indexOf(a.gid)-GAME_ORDER.indexOf(b.gid)||a.start-b.start);
 }

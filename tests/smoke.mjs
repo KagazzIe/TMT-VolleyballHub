@@ -125,6 +125,18 @@ await check('clips team', '/team/clips/', async p => {
   await p.click('#filters .chip[data-v="Unassigned"]');
   expect((await p.innerText('#results')).startsWith('1 of 6'), 'Unassigned should show the one untagged clip');
 });
+await check('clips: games from one video sort by where they start', '/team/clips/', async p => {
+  const order = await p.evaluate(() => {
+    const game = (id, name, vid, start) => ({ game: { id, name, date: '2026-02-01', videoId: vid }, clips: [{ id: 'c' + id, start, end: start + 5, players: [], action: 'Serve' }] });
+    ingest(game('g1', 'Match A', 'vid-one-aaa', 900)); ingest(game('g2', 'Match B', 'vid-one-aaa', 100));
+    ingest(game('g3', 'Match C', 'vid-two-bbb', 50)); ingest(game('g0', 'Match 0', 'vid-two-bbb', 2000));
+    sortAll(); const old = GAME_ORDER.filter(g => /^g\d$/.test(g));
+    F.order = 'new'; sortAll(); const neu = GAME_ORDER.filter(g => /^g\d$/.test(g)); F.order = 'old';
+    return { old: old.join(), neu: neu.join() };
+  });
+  // Same video: by first clip (B before A, C before 0). Videos on the same day: by their first game name ('Match 0' < 'Match A')
+  expect(order.old === 'g3,g0,g2,g1' && order.neu === 'g1,g2,g0,g3', `unexpected game order ${JSON.stringify(order)}`);
+});
 await check('clips volume and video quality', '/team/clips/', async p => {
   await p.click('#list .clip'); await p.waitForTimeout(150);
   const yt = () => p.evaluate(() => { const q = __yt.players.at(-1); return { vol: q.vol, muted: q.muted, controls: q.opts.playerVars.controls }; });
