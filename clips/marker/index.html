@@ -24,11 +24,14 @@ main{display:grid;grid-template-columns:min(var(--pct,62%),calc(100% - 344px)) m
 @media(max-width:900px){main{grid-template-columns:1fr}}
 .panel{background:var(--card);border-radius:var(--r);padding:12px}
 .vid{position:relative;aspect-ratio:16/9;background:#000;border-radius:var(--r-sm);overflow:hidden}
-.vid iframe{position:absolute;inset:0;width:100%;height:100%}
-/* YouTube's player is laid out at 1920x1080 and scaled down to fit, so its
-   automatic quality picks the highest available (up to 1080p). See AGENTS.md. */
-.vid.hq iframe{inset:auto;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;transform:scale(var(--yts,1))}
-#shield{position:absolute;inset:0;cursor:pointer}
+/* The video box is a multi-angle stage from ../../assets/angles.js (layout, sync, quality, full screen) */
+#angles{margin-top:10px}
+.angrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--edge)}
+.angrow:first-of-type{border-top:0}
+.angrow .alabel{width:150px}
+.angrow .shift{font-variant-numeric:tabular-nums;color:var(--muted);min-width:92px}
+.angrow button{padding:4px 9px;min-height:32px}
+.angrow .first{color:var(--muted);font-size:13px}
 .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
 .sizectl{display:flex;align-items:center;gap:6px;color:var(--muted);margin-left:auto}
 .sizectl input{width:120px;padding:0;min-height:0;border:0;background:none}
@@ -73,6 +76,7 @@ textarea{width:100%;min-height:150px;margin-top:6px}
 #ghStat{margin:0 0 10px}
 </style>
 <script src="../../assets/github.js"></script>
+<script src="../../assets/angles.js"></script>
 </head>
 <body>
 <div id="warn">YouTube blocks playback on pages opened straight from a file. Run <code>python3 -m http.server</code> in this folder and open <code>http://localhost:8000/</code>, or host it on GitHub Pages.</div>
@@ -80,6 +84,7 @@ textarea{width:100%;min-height:150px;margin-top:6px}
 <div class="tools">
   <input id="url" placeholder="Paste a YouTube link">
   <button id="load" class="pri">Load video</button>
+  <button id="addang" title="Add another camera angle of the same game">Add angle</button>
   <input id="gname" placeholder="Game name" aria-label="Game name" style="width:170px">
   <input id="gdate" type="date" aria-label="Game date">
   <button id="newgame">New game</button>
@@ -88,7 +93,7 @@ textarea{width:100%;min-height:150px;margin-top:6px}
 </div>
 <main>
   <section class="panel">
-    <div class="vid hq"><div id="player"></div><div id="shield" title="Click to play or pause"></div></div>
+    <div class="vid" id="vid"></div>
     <div class="bar">
       <button id="pp" aria-label="Play or pause">▶</button>
       <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Seek">
@@ -97,6 +102,11 @@ textarea{width:100%;min-height:150px;margin-top:6px}
       <span class="vol"><button id="mute" aria-label="Mute"></button><input type="range" id="vol" min="0" max="100" step="1" aria-label="Volume"></span>
     </div>
     <button id="mark" class="pri markbtn">Mark moment (M)</button>
+    <details id="angles" hidden>
+      <summary>Angles and sync</summary>
+      <p class="mut" style="margin:8px 0 6px">Clips are marked once for every angle. To line the angles up, pause on a sharp moment, like a serve contact or a whistle, and nudge the other angle until it shows the same moment. The first angle is the one clips open on, with its sound.</p>
+      <div id="anglist"></div>
+    </details>
     <div class="keys" id="keys"></div>
     <details>
       <summary>Roster and clip length</summary>
@@ -146,63 +156,105 @@ try{const old=localStorage.getItem('clipmarker:v1');if(old&&!localStorage.getIte
 const $=s=>document.querySelector(s);
 let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 const SAVED=S;
-S=Object.assign({game:{id:newId(),name:'',date:today(),videoId:''},roster:[...DEFAULT_ROSTER],actions:DEFAULT_ACTIONS.map(a=>[...a]),size:62,cmdkeys:{},pkeys:[],clips:[],pre:6,post:4},S||{});
+S=Object.assign({game:{id:newId(),name:'',date:today(),videos:[]},roster:[...DEFAULT_ROSTER],actions:DEFAULT_ACTIONS.map(a=>[...a]),size:62,cmdkeys:{},pkeys:[],clips:[],pre:6,post:4},S||{});
 if(S.match){S.game={id:newId(),name:S.match.title||'',date:S.match.date||today(),videoId:S.match.videoId||''};delete S.match}
+// Version 4: a game lists its videos ({id, label, at}); `at` is where each starts on the game's clock.
+// The clock starts with the first video (its at is 0), so older hubs can still play files on that video.
+if(!Array.isArray(S.game.videos))S.game.videos=S.game.videoId?[{id:S.game.videoId,label:'',at:0}]:[];
+delete S.game.videoId;
 if(SAVED&&SAVED.cfgv!==3){S.actions=DEFAULT_ACTIONS.map(a=>[...a]);S.pkeys=[];S.clips.forEach(c=>{if(c.action==='Spike')c.action='Hit'})}
 S.cfgv=3;
 if(S.roster.every((n,i)=>n==='Player '+(i+1)))S.roster=[...DEFAULT_ROSTER];
 let ACTIONS=S.actions;
 if(!(S.size>=40&&S.size<=80))S.size=62;
 S.clips.forEach(c=>{if(!Array.isArray(c.players))c.players=c.player?[c.player]:[];delete c.player});
-let sel=null,yt=null,ready=false,apiReady=false,previewEnd=null,dragging=false;
+let sel=null,previewEnd=null,dragging=false;
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const r1=n=>Math.round(n*10)/10;
 const pad=n=>String(n).padStart(2,'0');
 const fmt=t=>{t=Math.max(0,t|0);const h=t/3600|0,m=(t%3600)/60|0,s=t%60;return (h?h+':'+pad(m):m)+':'+pad(s)};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const sortClips=()=>S.clips.sort((a,b)=>a.start-b.start);
-const cur=()=>ready?yt.getCurrentTime():0;
-const dur=()=>ready?yt.getDuration():0;
+// Times are game time (see angles.js); the seek bar spans every angle
+const cur=()=>stage.time();
+const span=()=>stage.range();
+const firstId=()=>S.game.videos[0]&&S.game.videos[0].id;
 let tt;const toast=(m,ms,err)=>{const t=$('#toast');t.textContent=m;t.classList.toggle('err',!!err);t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),ms||1200)};
 
 if(location.protocol==='file:')$('#warn').style.display='block';
 
-/* YouTube player */
-const tag=document.createElement('script');tag.src='https://www.youtube.com/iframe_api';document.head.appendChild(tag);
-window.onYouTubeIframeAPIReady=()=>{apiReady=true;if(S.game.videoId)mount(S.game.videoId)};
-function mount(id,startAt){
-  if(yt&&ready){yt.loadVideoById(id);return}
-  if(yt)return;
-  yt=new YT.Player('player',{videoId:id,width:1920,height:1080,playerVars:{controls:0,disablekb:1,rel:0,modestbranding:1,playsinline:1,start:Math.floor(startAt||0)},
-    events:{onReady:()=>{ready=true;applyVol();if(+$('#rate').value!==1)yt.setPlaybackRate(+$('#rate').value)},onStateChange:syncPP}});
-}
+/* Video: all the game's angles on one stage */
+const stage=TMTAngles.stage($('#vid'),{onToggle:()=>toggle(),onChange:()=>{syncPP();renderAngles()}});
+function mountAll(){stage.setVideos(S.game.videos);applyVol();stage.setRate(+$('#rate').value);renderAngles()}
 function parseId(v){const m=v.match(/(?:v=|youtu\.be\/|embed\/|shorts\/|live\/)([\w-]{11})/)||v.trim().match(/^([\w-]{11})$/);return m&&m[1]}
+// Load video: the game's (first) video. A different one starts a new game.
 $('#load').onclick=()=>{
   const id=parseId($('#url').value);
   if(!id)return alert('Could not find a YouTube video ID in that link.');
-  if(id!==S.game.videoId&&S.clips.length&&!confirm('A different video starts a new game and clears the current clips. Download the JSON first if you need it. Continue?'))return;
-  if(id!==S.game.videoId&&S.clips.length)freshGame();
-  S.game.videoId=id;save();render();if(apiReady)mount(id);
+  if(id!==firstId()&&S.clips.length&&!confirm('A different video starts a new game and clears the current clips. Download the JSON first if you need it. Continue?'))return;
+  if(id!==firstId()&&S.clips.length)freshGame();
+  if(id!==firstId())S.game.videos=[{id,label:'',at:0}];
+  save();render();mountAll();
 };
+// Add angle: another video of the same game, starting at the same moment until it's nudged
+$('#addang').onclick=()=>{
+  const id=parseId($('#url').value);
+  if(!id)return alert('Paste the YouTube link of the other angle first.');
+  if(!S.game.videos.length){$('#load').click();return}
+  if(S.game.videos.some(v=>v.id===id))return toast('That video is already an angle',2000);
+  S.game.videos.push({id,label:'',at:0});save();mountAll();$('#angles').open=true;
+  toast('Angle added. Line it up under Angles and sync.',2500);
+};
+// Move the game's clock so the first video starts at 0 (clip times move with it)
+function rebase(){
+  const z=S.game.videos.length?S.game.videos[0].at:0;if(!z)return;
+  S.game.videos.forEach(v=>v.at=r1(v.at-z));S.clips.forEach(c=>{c.start=r1(c.start-z);c.end=r1(c.end-z)});
+}
+const angName=(v,i)=>v.label||'Angle '+String.fromCharCode(65+i);
+function renderAngles(){
+  const V=S.game.videos;$('#angles').hidden=!V.length;
+  const audio=stage.audioIndex();
+  $('#anglist').innerHTML=V.map((v,i)=>`<div class="angrow" data-i="${i}">
+    <input class="alabel" data-f="label" value="${esc(v.label)}" placeholder="${esc(angName(v,i))}" aria-label="Angle name">${i===audio&&V.length>1?'<span class="first">(sound)</span>':''}
+    ${i?`<span class="shift" title="How much later this video started than the first">${v.at>=0?'+':''}${v.at.toFixed(1)} s</span>
+      <button data-n="-1">−1 s</button><button data-n="-0.1">−0.1</button><button data-n="0.1">+0.1</button><button data-n="1">+1 s</button>
+      <button data-a="first" title="Clips open on this angle, with its sound">Make first</button>`:'<span class="first">First angle: clips open on it</span>'}
+    ${V.length>1?`<button data-a="del" aria-label="Remove this angle">✕</button>`:''}</div>`).join('');
+}
+$('#anglist').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;b.blur();
+  const i=+b.closest('.angrow').dataset.i,V=S.game.videos;
+  if(b.dataset.n){
+    // Nudging keeps the game time, so the other angles hold still while this one moves
+    V[i].at=r1(V[i].at+ +b.dataset.n);const t=cur();save();mountAll();stage.seek(t);
+  }else if(b.dataset.a==='first'){V.unshift(...V.splice(i,1));rebase();save();mountAll();render()}
+  else if(b.dataset.a==='del'){
+    if(!confirm('Remove '+angName(V[i],i)+' from this game?'))return;
+    V.splice(i,1);rebase();save();mountAll();render();
+  }
+});
+$('#anglist').addEventListener('change',e=>{
+  if(e.target.dataset.f!=='label')return;
+  const i=+e.target.closest('.angrow').dataset.i;S.game.videos[i].label=e.target.value.trim();save();mountAll();
+});
 
 /* Transport */
-function syncPP(){$('#pp').textContent=ready&&yt.getPlayerState()===1?'❚❚':'▶'}
-function toggle(){if(!ready)return;previewEnd=null;yt.getPlayerState()===1?yt.pauseVideo():yt.playVideo()}
-function seekBy(d){if(ready)yt.seekTo(Math.max(0,cur()+d),true)}
-function setRate(r){if(!ready)return;yt.setPlaybackRate(r);$('#rate').value=r}
-function stepRate(d){if(!ready)return;const i=Math.max(0,Math.min(RATES.length-1,RATES.indexOf(yt.getPlaybackRate())+d));setRate(RATES[i])}
+function syncPP(){$('#pp').textContent=stage.playing()?'❚❚':'▶'}
+function toggle(){if(!stage.ready())return;previewEnd=null;stage.playing()?stage.pause():stage.play()}
+function seekBy(d){if(stage.ready())stage.seek(Math.max(span()[0],cur()+d))}
+function setRate(r){stage.setRate(r);$('#rate').value=r}
+function stepRate(d){const i=Math.max(0,Math.min(RATES.length-1,RATES.indexOf(+$('#rate').value)+d));setRate(RATES[i])}
 $('#rate').innerHTML=RATES.map(r=>`<option value="${r}" ${r===1?'selected':''}>${r}x</option>`).join('');
 $('#rate').onchange=e=>{setRate(+e.target.value);e.target.blur()};
 $('#pp').onclick=toggle;
-$('#shield').onclick=toggle;
-$('#seek').oninput=e=>{dragging=true;previewEnd=null;if(ready)yt.seekTo(e.target.value/1000*dur(),true)};
+$('#seek').oninput=e=>{dragging=true;previewEnd=null;const[a,b]=span();if(stage.ready()&&b>a)stage.seek(a+e.target.value/1000*(b-a))};
 $('#seek').onchange=e=>{dragging=false;e.target.blur()};
 setInterval(()=>{
-  if(!ready)return;
-  const t=cur(),d=dur();
-  if(previewEnd!=null&&t>=previewEnd){yt.pauseVideo();previewEnd=null}
-  if(!dragging&&d)$('#seek').value=t/d*1000;
-  $('#time').textContent=fmt(t)+' / '+fmt(d);
+  if(!stage.ready())return;
+  const t=cur(),[a,b]=span();
+  if(previewEnd!=null&&t>=previewEnd){stage.pause();previewEnd=null}
+  if(!dragging&&b>a)$('#seek').value=(t-a)/(b-a)*1000;
+  $('#time').textContent=fmt(t)+' / '+fmt(b);
   syncPP();
 },100);
 
@@ -215,30 +267,25 @@ let muted=pref('tmt:muted','0')==='1';
 try{localStorage.removeItem('tmt:ytcontrols')}catch(e){}  // setting from an earlier version
 const ICON_ON='<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',ICON_OFF='<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 function syncVol(){const off=muted||!vol;$('#vol').value=off?0:vol;$('#mute').innerHTML=off?ICON_OFF:ICON_ON;$('#mute').setAttribute('aria-label',off?'Unmute':'Mute')}
-function applyVol(){syncVol();if(!ready)return;yt.setVolume(vol);(muted||!vol)?yt.mute():yt.unMute()}
+function applyVol(){syncVol();stage.setVolume(vol,muted||!vol)}
 $('#vol').oninput=e=>{vol=+e.target.value;muted=false;applyVol()};
 $('#vol').onchange=e=>{setPref('tmt:volume',vol);setPref('tmt:muted','0');e.target.blur()};
 $('#mute').onclick=()=>{muted=!(muted||!vol);if(!muted&&!vol)vol=50;setPref('tmt:muted',muted?'1':'0');setPref('tmt:volume',vol);applyVol()};
-// Keep the full-HD player scaled to the box
-const vidBox=document.querySelector('.vid');
-const fitPlayer=()=>vidBox.style.setProperty('--yts',vidBox.clientWidth/1920);
-try{new ResizeObserver(fitPlayer).observe(vidBox)}catch(e){addEventListener('resize',fitPlayer)}
-fitPlayer();
 
 syncVol();
 
 /* Clips */
 function mark(){
-  if(!ready)return toast('Load a video first');
-  const t=cur();
-  const c={id:Date.now().toString(36),start:r1(Math.max(0,t-S.pre)),end:r1(Math.min(dur()||1e9,t+S.post)),players:[],action:'',note:''};
+  if(!stage.ready())return toast('Load a video first');
+  const t=cur(),[a,b]=span();
+  const c={id:Date.now().toString(36),start:r1(Math.max(a,t-S.pre)),end:r1(Math.min(b>a?b:1e9,t+S.post)),players:[],action:'',note:''};
   S.clips.push(c);sortClips();sel=c.id;save();render();toast('Marked at '+fmt(t));
 }
 $('#mark').onclick=mark;
 function preview(c){
-  if(!ready)return;
+  if(!stage.ready())return;
   select(c.id);previewEnd=null;
-  yt.seekTo(c.start,true);yt.playVideo();
+  stage.seek(c.start);stage.play();
   setTimeout(()=>{previewEnd=c.end},400);
 }
 function select(id){sel=id;document.querySelectorAll('.clip').forEach(x=>x.classList.toggle('sel',x.dataset.id===id))}
@@ -320,13 +367,13 @@ const CMDS=[
   ['back5','Skip back 5s','arrowleft'],['fwd5','Skip forward 5s','arrowright'],
   ['back1','Skip back 1s','shift+arrowleft'],['fwd1','Skip forward 1s','shift+arrowright'],
   ['prev','Select previous clip','arrowup'],['next','Select next clip','arrowdown'],
-  ['replay','Replay selected clip','enter'],['slower','Slower','['],['faster','Faster',']']
+  ['replay','Replay selected clip','enter'],['slower','Slower','['],['faster','Faster',']'],['fs','Full screen','f']
 ];
 const ckey=id=>S.cmdkeys[id]??CMDS.find(c=>c[0]===id)[2];
 const pkey=i=>S.pkeys[i]??(DEFAULT_PKEYS[i]||'');
 const curClip=()=>S.clips.find(x=>x.id===sel);
 const RUN={mark,toggle,back5:()=>seekBy(-5),fwd5:()=>seekBy(5),back1:()=>seekBy(-1),fwd1:()=>seekBy(1),
-  prev:()=>move(-1),next:()=>move(1),replay:()=>{const c=curClip();if(c)preview(c)},slower:()=>stepRate(-1),faster:()=>stepRate(1)};
+  prev:()=>move(-1),next:()=>move(1),replay:()=>{const c=curClip();if(c)preview(c)},slower:()=>stepRate(-1),faster:()=>stepRate(1),fs:()=>{if(stage.ready())stage.fullscreen()}};
 function togglePlayer(n){
   const c=curClip();if(!c)return toast('Mark a clip first');
   c.players=c.players.includes(n)?c.players.filter(p=>p!==n):[...c.players,n];
@@ -416,10 +463,10 @@ document.addEventListener('keydown',e=>{
 /* Settings */
 $('#gname').value=S.game.name||'';$('#gdate').value=S.game.date||'';
 $('#pre').value=S.pre;$('#post').value=S.post;$('#roster').value=S.roster.join('\n');
-$('#url').value=S.game.videoId?'https://www.youtube.com/watch?v='+S.game.videoId:'';
+$('#url').value=firstId()?'https://www.youtube.com/watch?v='+firstId():'';
 $('#gname').oninput=e=>{S.game.name=e.target.value.trim();save()};
 $('#gdate').onchange=e=>{S.game.date=e.target.value;save()};
-function freshGame(){S.game={id:newId(),name:'',date:today(),videoId:S.game.videoId};S.clips=[];sel=null;$('#gname').value='';$('#gdate').value=S.game.date}
+function freshGame(){S.game={id:newId(),name:'',date:today(),videos:S.game.videos.map(v=>({...v}))};S.clips=[];sel=null;$('#gname').value='';$('#gdate').value=S.game.date}
 $('#newgame').onclick=()=>{
   if(S.clips.length&&!confirm('Start a new game? This clears the current clips, so download the JSON first. The video stays loaded.'))return;
   freshGame();save();render();toast('New game started');
@@ -435,8 +482,9 @@ $('#size').onchange=e=>{save();e.target.blur()};
 /* Import / export */
 function out(){
   sortClips();
-  return{version:3,
-    game:{id:S.game.id,name:S.game.name,date:S.game.date,videoId:S.game.videoId},
+  // videoId is the first video, for hubs from before angles (the game's clock starts with it)
+  return{version:4,
+    game:{id:S.game.id,name:S.game.name,date:S.game.date,videoId:firstId()||'',videos:S.game.videos.map(({id,label,at})=>({id,label,at}))},
     roster:S.roster,
     clips:S.clips.map(({id,start,end,players,action,note})=>({id,start,end,players,action,note}))};
 }
@@ -478,16 +526,18 @@ $('#file').onchange=async e=>{
     const d=JSON.parse(await f.text());if(!Array.isArray(d.clips))throw 0;
     if(S.clips.length&&!confirm('Importing replaces the game you are working on. Download its JSON first if you need it. Continue?')){e.target.value='';return}
     const g=d.game||{},m=d.match||{};
-    S.game={id:g.id||newId(),name:g.name||m.title||'',date:g.date||m.date||'',videoId:g.videoId||m.videoId||''};
+    const vid=g.videoId||m.videoId||'',vids=Array.isArray(g.videos)?g.videos.filter(v=>v&&typeof v.id==='string'&&v.id).map(v=>({id:v.id,label:typeof v.label==='string'?v.label:'',at:Number.isFinite(+v.at)?+v.at:0})):[];
+    S.game={id:g.id||newId(),name:g.name||m.title||'',date:g.date||m.date||'',videos:vids.length?vids:vid?[{id:vid,label:'',at:0}]:[]};
     if(Array.isArray(d.roster)&&d.roster.length)S.roster=d.roster;
     S.clips=d.clips.map(c=>{const p=Array.isArray(c.players)?c.players:(c.player?[c.player]:[]);const{player,...r}=c;return{...r,players:p}});sel=null;save();render();
     $('#gname').value=S.game.name||'';$('#gdate').value=S.game.date||'';$('#roster').value=S.roster.join('\n');
-    $('#url').value=S.game.videoId?'https://www.youtube.com/watch?v='+S.game.videoId:'';
-    if(apiReady&&S.game.videoId)mount(S.game.videoId);
+    $('#url').value=firstId()?'https://www.youtube.com/watch?v='+firstId():'';
+    rebase();save();render();mountAll();
   }catch(_){alert('That file is not a clip export from this tool.')}
   e.target.value='';
 };
 render();
+if(S.game.videos.length)mountAll();
 // Use the team roster from the team data folder until a roster is set here
 fetch('../../team/team.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(t=>{
   if(!t)return;

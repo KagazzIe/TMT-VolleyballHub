@@ -141,14 +141,60 @@ await check('clips warm up to HD before the first clip', '/team/clips/', async p
   await p.evaluate(() => { window.__ytQuality = 'medium'; });
   await p.click('#list .clip'); await p.waitForTimeout(300);
   const c = await p.evaluate(() => ({ start: cur.start }));
-  let s = await p.evaluate(() => { const q = __yt.players.at(-1); return { cover: !document.getElementById('warm').hidden, muted: q.muted, t: q.t }; });
+  let s = await p.evaluate(() => { const q = __yt.players.at(-1); return { cover: !document.querySelector('.ang-warm').hidden, muted: q.muted, t: q.t }; });
   expect(s.cover && s.muted && s.t <= c.start - 1, `a player below HD should warm up before the clip, muted and covered, got ${JSON.stringify(s)}`);
   await p.evaluate(() => { __yt.players.at(-1).q = 'hd1080'; }); await p.waitForTimeout(300);
-  s = await p.evaluate(() => { const q = __yt.players.at(-1); return { cover: !document.getElementById('warm').hidden, muted: q.muted, t: q.t, state: q.state }; });
+  s = await p.evaluate(() => { const q = __yt.players.at(-1); return { cover: !document.querySelector('.ang-warm').hidden, muted: q.muted, t: q.t, state: q.state }; });
   expect(!s.cover && !s.muted && s.t === c.start && s.state === 1, `once in HD it should play the clip from its start, got ${JSON.stringify(s)}`);
   // The next clip plays right away
   await p.click('#next'); await p.waitForTimeout(150);
-  expect(await p.evaluate(() => document.getElementById('warm').hidden && __yt.players.at(-1).t === cur.start), 'later clips should not warm up again');
+  expect(await p.evaluate(() => document.querySelector('.ang-warm').hidden && __yt.players.at(-1).t === cur.start), 'later clips should not warm up again');
+});
+await check('clips: several angles of one game', '/team/clips/', async p => {
+  // Angle B started 5 s after A, so at game time 100 it shows its own 95
+  await p.evaluate(() => {
+    ingest({ version: 4, game: { id: 'two', name: 'Two angles', date: '2026-03-01', videoId: 'angleAAAAAA',
+      videos: [{ id: 'angleAAAAAA', label: 'Court', at: 0 }, { id: 'angleBBBBBB', label: 'End line', at: 5 }] },
+      clips: [{ id: 'c1', start: 100, end: 110, players: [], action: 'Serve', note: '' }] });
+    afterLoad(); play(CLIPS.find(c => c.key === 'two:c1'));
+  });
+  await p.waitForTimeout(700);
+  const P = () => p.evaluate(() => stage.players().map(x => ({ id: x.id, t: x.yt.getCurrentTime(), muted: x.yt.muted, controls: x.yt.opts.playerVars.controls, x: parseFloat(x.tile.style.left), w: parseFloat(x.tile.style.width) })));
+  let s = await P();
+  expect(s.length === 2 && s[0].t === 100 && s[1].t === 95, `angles should line up on the game clock, got ${JSON.stringify(s)}`);
+  expect(s[0].x === 0 && s[1].x > s[0].w - 1 && Math.abs(s[0].w - s[1].w) < 1, `grid should split the box side by side, got ${JSON.stringify(s)}`);
+  expect(!s[0].muted && s[1].muted, 'the first angle should have the sound');
+  // Click the second angle: it gets focus and the sound
+  await p.locator('.ang-tile .ang-shield').nth(1).click(); await p.waitForTimeout(300);
+  s = await P();
+  const f = await p.evaluate(() => ({ focus: stage.focusIndex(), audio: stage.audioIndex() }));
+  expect(f.focus === 1 && f.audio === 1 && s[0].muted && !s[1].muted && s[1].w > s[0].w * 2, `clicking an angle should focus it with sound, got ${JSON.stringify({ f, s })}`);
+  const link = await p.evaluate(() => clipUrl('two:c1'));
+  expect(link.includes('v=angleBBBBBB') && link.endsWith('&t=95s'), `YouTube link should use the angle you're hearing, got ${link}`);
+  await p.click('.ang-tools [data-a="grid"]'); await p.waitForTimeout(200);
+  expect(await p.evaluate(() => stage.focusIndex() === -1 && stage.audioIndex() === 1), 'All angles should go back to the grid and keep the sound choice');
+  // Full screen: the sound angle alone, remade with YouTube's controls; and back
+  await p.click('.ang-tools [data-a="fs"]'); await p.waitForTimeout(400);
+  let fs = await p.evaluate(() => { const q = __yt.players.at(-1); return { on: stage.isFullscreen(), id: q.opts.videoId, controls: q.opts.playerVars.controls }; });
+  expect(fs.on && fs.id === 'angleBBBBBB' && fs.controls === 1, `full screen should use YouTube's controls on the sound angle, got ${JSON.stringify(fs)}`);
+  await p.click('.ang-tools [data-a="fs"]'); await p.waitForTimeout(400);
+  fs = await p.evaluate(() => { const q = __yt.players.at(-1); return { on: stage.isFullscreen(), controls: q.opts.playerVars.controls }; });
+  expect(!fs.on && fs.controls === 0, `leaving full screen should drop YouTube's controls, got ${JSON.stringify(fs)}`);
+});
+await check('marker: add, line up and reorder angles', '/team/clips/marker/', async p => {
+  await p.fill('#url', 'https://youtu.be/angleAAAAAA'); await p.click('#load'); await p.waitForTimeout(200);
+  await p.fill('#url', 'https://www.youtube.com/watch?v=angleBBBBBB'); await p.click('#addang'); await p.waitForTimeout(300);
+  expect(await p.evaluate(() => stage.players().length === 2 && S.game.videos.map(v => v.id).join() === 'angleAAAAAA,angleBBBBBB'), 'Add angle should add the second video');
+  await p.evaluate(() => { stage.seek(50); }); await p.click('#mark');
+  await p.click('#anglist .angrow[data-i="1"] [data-n="1"]'); await p.click('#anglist .angrow[data-i="1"] [data-n="0.1"]');
+  let g = await p.evaluate(() => ({ at: S.game.videos[1].at, start: S.clips[0].start }));
+  expect(g.at === 1.1, `nudging should move the angle on the game clock, got ${JSON.stringify(g)}`);
+  // Make B first: the game's clock now starts with B, and clip times move with it
+  await p.click('#anglist .angrow[data-i="1"] [data-a="first"]');
+  const r = await p.evaluate(() => ({ ids: S.game.videos.map(v => v.id + '@' + v.at).join(), start: S.clips[0].start, out: out() }));
+  expect(r.ids === 'angleBBBBBB@0,angleAAAAAA@-1.1' && Math.abs(r.start - (g.start - 1.1)) < 0.05, `Make first should rebase the clock, got ${JSON.stringify(r)}`);
+  expect(r.out.version === 4 && r.out.game.videoId === 'angleBBBBBB' && r.out.game.videos.length === 2, 'export should list the angles, first one as videoId');
+  await p.evaluate(() => { localStorage.clear(); });
 });
 await check('clips volume and video quality', '/team/clips/', async p => {
   await p.click('#list .clip'); await p.waitForTimeout(150);

@@ -29,10 +29,11 @@ is `tmt:github@<base path>` (sessionStorage, or localStorage when "Remember" is 
 pages as `tmt:volume` and `tmt:muted`.
 
 YouTube no longer lets embeds set video quality (`setPlaybackQuality` does nothing); its automatic
-quality follows the player's layout size. So the clip pages lay the iframe out at 1920x1080 and scale it
-down with CSS (`.vid.hq`), which makes YouTube pick the highest quality up to 1080p (verified on a real
-1080p video: 480p at normal size, 1080p this way). YouTube's own controls stay hidden (`controls: 0`);
-the pages provide play, seek, speed and volume.
+quality follows the player's layout size. So `assets/angles.js` lays the iframe out at 1920x1080 and scales
+it down with CSS, which makes YouTube pick the highest quality up to 1080p (verified on a real 1080p video:
+480p at normal size, 1080p this way). A new player still starts lower and steps up over about five seconds,
+so the first clip warms up first, muted and covered (`start(t, {warm: true})`). YouTube's own controls stay
+hidden (`controls: 0`) except in full screen; the pages provide play, seek, speed and volume.
 
 ## Pages
 | Path | File | Notes |
@@ -40,11 +41,27 @@ the pages provide play, seek, speed and volume.
 | `/` | `index.html` | Hub. Shows a demo note when no `team/team.json` exists. |
 | `/rotations/` | `rotations/index.html` | 5-1 rotation guide and its editor (saves or exports `rotations.json`). View keys: `rx\|rot` (receive), `sv\|rot\|lib` (serving), `bs\|rot\|lib` (base), `dl\|rot\|lib` / `dr\|rot\|lib` (defense against their left / right side hit, starting from base). Version 3 added the `dl`/`dr` views and per-view `arrows`: `{from, pts}` starts at a player, `{pts, dash: true}` is the ball; drawn as smooth curves through the points. Version 2 files still load. The team defense is three more views, `def\|bs`, `def\|dl`, `def\|dr`, with `pos` (and arrow `from`) keyed by spot (`LF MF RF LB MID RB`) instead of player; every rotation's Defense uses it unless that rotation has its own `pos`. |
 | `/clips/` | `clips/index.html` | Match clip viewer. |
-| `/clips/marker/` | `clips/marker/index.html` | Clip Marker, saves or exports one game JSON. |
+| `/clips/marker/` | `clips/marker/index.html` | Clip Marker, saves or exports one game JSON (version 4: `game.videos` lists the angles, see below). |
 | `/setup/` | `setup/index.html` | Team Setup, a form that saves or downloads `team.json` (`name`, `roster`, `labels`). Team `labels` set Clip Marker's play list and the viewer's filter order; without them the defaults are Serve, Receive, Set, Hit, Block. |
 
-Each page is one self-contained HTML file with inline CSS and JS, plus the shared stylesheet. The one
-shared script is `assets/github.js` (Save to GitHub), used by Team Setup, the rotation editor and Clip Marker.
+Each page is one self-contained HTML file with inline CSS and JS, plus the shared stylesheet. Shared
+scripts: `assets/github.js` (Save to GitHub; Team Setup, the rotation editor and Clip Marker) and
+`assets/angles.js` (the video stage; Match Clips and Clip Marker).
+
+## Video angles (`assets/angles.js`)
+A game can have several YouTube videos of the same match. Game JSON version 4 lists them as
+`game.videos: [{id, label, at}]`. Clip times are on the game's own clock; `at` is where a video starts on it,
+so video time = game time - at. The clock starts with the first video (its `at` is 0) and `game.videoId` is
+that first video, so hubs from before angles still play a version 4 game on it. Version 3 games (one
+`videoId`) read as one angle at 0. The first video is the default angle: clips open on it, with its sound.
+- `TMTAngles.stage(el, {onToggle, onChange})` turns a box into the stage. Then `setVideos`, `start(t, {warm})`,
+  `seek`, `play`, `pause`, `time`, `range`, `setRate`, `setVolume(vol, muted)`, `focus`, `fullscreen`.
+  Everything is in game time. Pages never touch YouTube players directly.
+- Layout is like a video call: a grid by default; clicking an angle focuses it (big, others in a strip)
+  and moves the sound to it. Full screen shows the sound angle alone, remade with YouTube's controls.
+- Players are never moved in the page (that reloads an iframe); tiles are placed absolutely. The sound
+  angle is laid out at 1920x1080 and the others at 1280x720 (quality follows layout size).
+- The sound angle leads; others re-seek when they drift more than 0.35 s (YouTube can't frame-lock).
 
 ## Save to GitHub (`assets/github.js`)
 - `TMTGitHub.ready` resolves to `{repo}` from `team/site.json` (written by the deploy), or `null` on the demo.

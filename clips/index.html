@@ -6,6 +6,7 @@
 <title>Match Clips · TMT: Volleyball Hub</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;600&display=swap">
 <link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/angles.js"></script>
 <style>
 /* Page styles. Colors, fonts and radii come from ../assets/theme.css (see AGENTS.md). */
 body{font-size:15px}
@@ -28,17 +29,9 @@ main>*{min-width:0}
 .sizectl input{width:120px}
 #stage{position:sticky;top:14px;background:var(--bg)}
 .vid{position:relative;aspect-ratio:16/9;background:#000;border-radius:var(--r);overflow:hidden}
-.vid iframe{position:absolute;inset:0;width:100%;height:100%}
-/* YouTube's player is laid out at 1920x1080 and scaled down to fit, so its
-   automatic quality picks the highest available (up to 1080p). See AGENTS.md. */
-.vid.hq iframe{inset:auto;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;transform:scale(var(--yts,1))}
-#shield{position:absolute;inset:0;cursor:pointer}
-#over{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(10,18,30,.72);color:#fff;text-align:center;padding:12px}
+/* The video box is a multi-angle stage from ../assets/angles.js (layout, sync, quality, full screen) */
+#over{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(10,18,30,.72);color:#fff;text-align:center;padding:12px}
 #over .row{display:flex;gap:8px}
-#warm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;background:#000;color:#fff;font-weight:600}
-#warm::before{content:'';width:18px;height:18px;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){#warm::before{animation:none}}
 #over button:not(.pri){background:#dde3ec;color:#14213d}
 .bar{display:flex;gap:8px;align-items:center;padding:10px 0 4px}
 #seek{flex:1;min-width:0}
@@ -110,7 +103,7 @@ main>*{min-width:0}
 </header>
 <main>
   <section id="stage">
-    <div class="vid hq"><div id="player"></div><div id="shield"></div><div id="over"></div><div id="warm" hidden>Loading HD…</div></div>
+    <div class="vid" id="vid"><div id="over"></div></div>
     <div class="bar">
       <button id="prev" aria-label="Previous clip">⏮</button>
       <button id="pp" aria-label="Play or pause">▶</button>
@@ -151,7 +144,7 @@ let GAMES={},GAME_ORDER=[],CLIPS=[],ROSTER=[];
 const Q=new URLSearchParams(location.search);
 const F={games:Q.getAll('game').length?new Set(Q.getAll('game')):null,players:new Set(Q.getAll('player')),actions:new Set(Q.getAll('action')),all:Q.get('all')==='1',q:Q.get('q')||'',order:Q.get('order')==='new'?'new':'old'};
 if(F.actions.delete('Missed Receives')){F.actions.add('Receive');F.players.add(NOBODY)}
-let cur=null,yt=null,ready=false,apiReady=false,wantMake=false,loadedVid=null,ended=false,armed=0,dragging=false;
+let cur=null,ready=false,ended=false,armed=0,prevT=0,dragging=false;
 if(location.protocol==='file:')$('#warn').hidden=false;
 let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),1400)};
 
@@ -159,12 +152,15 @@ let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on')
 function ingest(d){
   if(!d||!Array.isArray(d.clips))return false;
   const g=d.game||{},m=d.match||{};
-  const vid=g.videoId||m.videoId;if(!vid)return false;
+  // Version 4 games list their videos (angles), each with where it starts on the game's clock (at).
+  // Older games have one video, starting at 0, so their clip times are video times.
+  const vids=Array.isArray(g.videos)?g.videos.filter(v=>v&&typeof v.id==='string'&&v.id).map(v=>({id:v.id,label:typeof v.label==='string'?v.label:'',at:Number.isFinite(+v.at)?+v.at:0})):[];
+  const vid=(vids[0]&&vids[0].id)||g.videoId||m.videoId;if(!vid)return false;
   const name=g.name||m.title||'Untitled game',date=g.date||m.date||'';
   const gid=g.id||('legacy-'+vid+'-'+(date||name));
   // first: when the game's first clip starts, to order several games cut from one video
   const starts=d.clips.map(c=>+c.start).filter(Number.isFinite);
-  GAMES[gid]={id:gid,name,date,vid,first:starts.length?Math.min(...starts):Infinity};
+  GAMES[gid]={id:gid,name,date,vid,videos:vids.length?vids:[{id:vid,label:'',at:0}],first:starts.length?Math.min(...starts):Infinity};
   (d.roster||[]).forEach(n=>{if(!ROSTER.includes(n))ROSTER.push(n)});
   CLIPS=CLIPS.filter(c=>c.gid!==gid);
   d.clips.forEach(c=>{
@@ -349,50 +345,28 @@ function setUrl(){try{const q=viewQuery(true);history.replaceState(null,'',q?'?'
 async function copyText(text,msg){
   try{await navigator.clipboard.writeText(text);toast(msg)}catch(e){prompt('Copy this link:',text)}
 }
-const clipUrl=key=>{const c=CLIPS.find(x=>x.key===key);return 'https://www.youtube.com/watch?v='+c.vid+'&t='+Math.floor(c.start)+'s'};
+// A YouTube link for the angle you're listening to (or the game's first angle), at that video's time
+const clipUrl=key=>{
+  const c=CLIPS.find(x=>x.key===key),g=GAMES[c.gid],v=(stageGame===c.gid&&g.videos[stage.audioIndex()])||g.videos[0];
+  return 'https://www.youtube.com/watch?v='+v.id+'&t='+Math.max(0,Math.floor(c.start-v.at))+'s';
+};
 $('#copy').onclick=()=>{const q=viewQuery(false);copyText(location.origin+location.pathname+(q?'?'+q:''),'Filter link copied')};
 
-/* ---------- player: every clip is cropped to its start and end ---------- */
-window.onYouTubeIframeAPIReady=()=>{apiReady=true;if(wantMake&&cur)make(cur)};
-const tag=document.createElement('script');tag.src='https://www.youtube.com/iframe_api';document.head.appendChild(tag);
-function make(c){
-  loadedVid=c.vid;
-  yt=new YT.Player('player',{videoId:c.vid,width:1920,height:1080,playerVars:{controls:0,disablekb:1,rel:0,modestbranding:1,playsinline:1,start:Math.floor(c.start)},
-    events:{onReady:()=>{ready=true;applyVol();go()},onStateChange:e=>{syncPP();if(e.data===1)applyRate()}}});
-}
-// A new player (or a new video) starts below its best quality and steps up over about five seconds, which is
-// half of a typical clip. So the first time, it warms up first: it plays the few seconds before the clip, muted
-// and covered, until it reaches its best quality (1080p at most, see AGENTS.md), then jumps to the clip start.
-// Later clips keep that quality, so they play right away.
-const QUALITY=['hd2160','hd1440','hd1080','hd720','large','medium','small','tiny'];
-let warmVid=null,warm=null;
-function atBest(){
-  try{
-    const best=yt.getAvailableQualityLevels().filter(q=>QUALITY.includes(q))[0],q=QUALITY.indexOf(yt.getPlaybackQuality());
-    return !!best&&q>=0&&q<=Math.max(QUALITY.indexOf(best),QUALITY.indexOf('hd1080'));
-  }catch(e){return false}
-}
-function startWarm(c){
-  if(!warm||warm.vid!==c.vid)warm={vid:c.vid,t0:performance.now()};
-  $('#warm').hidden=false;armed=Infinity;yt.mute();
-  const from=Math.max(0,c.start-8);
-  if(loadedVid===c.vid){yt.seekTo(from,true);yt.playVideo()}
-  else{yt.loadVideoById({videoId:c.vid,startSeconds:from});loadedVid=c.vid}
-  applyRate();
-}
-function endWarm(){warmVid=warm.vid;warm=null;$('#warm').hidden=true;applyVol();go()}
+/* ---------- player: every clip is cropped to its start and end, on all the game's angles ---------- */
+const stage=TMTAngles.stage($('#vid'),{onToggle:()=>toggle(),onChange:()=>syncPP()});
+let stageGame=null;
 function go(){
   const c=cur;ended=false;$('#over').hidden=true;
-  if(warmVid!==c.vid)return startWarm(c);
-  armed=performance.now()+700;
-  if(loadedVid===c.vid){yt.seekTo(c.start,true);yt.playVideo()}
-  else{yt.loadVideoById({videoId:c.vid,startSeconds:c.start});loadedVid=c.vid}
-  applyRate();
+  if(stageGame!==c.gid){stage.setVideos(GAMES[c.gid].videos);stageGame=c.gid}
+  armed=performance.now()+700;prevT=c.start;
+  applyRate();applyVol();
+  // The first clip warms up to HD first (see angles.js); later clips play right away
+  stage.start(c.start,{warm:true});
 }
 function play(c){
   if(!c)return;
-  cur=c;ended=false;renderNow();markSel();setUrl();$('#over').hidden=true;
-  if(ready)go();else if(!yt){apiReady?make(c):wantMake=true}
+  cur=c;ended=false;ready=true;renderNow();markSel();setUrl();$('#over').hidden=true;
+  go();
 }
 function showOver(mode){
   const o=$('#over');o.hidden=false;
@@ -407,36 +381,36 @@ function nextClip(d){
 }
 function step(d){const c=nextClip(d);if(c)play(c)}
 function toggle(){
-  if(!cur||warm)return;
+  if(!cur||stage.busy())return;
   if(!ready||ended)return play(cur);
-  yt.getPlayerState()===1?yt.pauseVideo():yt.playVideo();
+  stage.playing()?stage.pause():stage.play();
 }
 const RATES=[0.25,0.5,0.75,1,1.25,1.5,2];
 let rate=1;
 try{const v=+localStorage.getItem('clipviewer:rate');if(RATES.includes(v))rate=v}catch(e){}
 $('#rate').innerHTML=RATES.map(r=>`<option value="${r}">${r}x</option>`).join('');
 $('#rate').value=rate;
-function applyRate(){if(ready&&yt.getPlaybackRate()!==rate)yt.setPlaybackRate(rate)}
+function applyRate(){stage.setRate(rate)}
 function setRate(r){rate=r;$('#rate').value=r;applyRate();try{localStorage.setItem('clipviewer:rate',r)}catch(e){}}
 function stepRate(d){const i=Math.max(0,Math.min(RATES.length-1,RATES.indexOf(rate)+d));setRate(RATES[i]);toast(RATES[i]+'x speed')}
 $('#rate').onchange=e=>{setRate(+e.target.value);e.target.blur()};
-function syncPP(){$('#pp').textContent=ready&&yt.getPlayerState()===1?'❚❚':'▶'}
-$('#pp').onclick=toggle;$('#shield').onclick=toggle;
+function syncPP(){$('#pp').textContent=stage.playing()?'❚❚':'▶'}
+$('#pp').onclick=toggle;
 $('#prev').onclick=()=>step(-1);$('#next').onclick=()=>step(1);
 $('#playall').onclick=()=>{const v=visible();if(v.length){$('#auto').checked=true;play(v[0])}};
 $('#seek').oninput=e=>{
-  if(!ready||!cur||warm)return;
+  if(!ready||!cur||stage.busy())return;
   dragging=true;ended=false;$('#over').hidden=true;
-  yt.seekTo(cur.start+e.target.value/1000*(cur.end-cur.start),true);
+  stage.seek(prevT=cur.start+e.target.value/1000*(cur.end-cur.start));
 };
 $('#seek').onchange=e=>{dragging=false;armed=performance.now()+500;e.target.blur()};
 setInterval(()=>{
-  if(!ready||!cur)return;
-  // Warming up: done at best quality, after 6 seconds, or once it reaches the clip anyway
-  if(warm){if(atBest()||performance.now()-warm.t0>6000||yt.getCurrentTime()>=cur.start-0.3)endWarm();return}
-  const t=yt.getCurrentTime(),len=cur.end-cur.start;
-  if(!ended&&performance.now()>armed&&t>=cur.end-0.05){
-    yt.pauseVideo();ended=true;
+  if(!ready||!cur||stage.busy())return;
+  const t=stage.time(),len=cur.end-cur.start;
+  // Stop when playback runs into the clip's end. A jump past it (like YouTube's own seek bar in full screen) doesn't.
+  const crossed=prevT<cur.end-0.05&&t>=cur.end-0.05&&t-prevT<2;prevT=t;
+  if(!ended&&stage.playing()&&performance.now()>armed&&crossed){
+    stage.pause();ended=true;
     const k=cur.key,n=nextClip(1);
     if($('#auto').checked&&n)setTimeout(()=>{if(ended&&cur&&cur.key===k)play(n)},600);
     else showOver('ended');
@@ -457,6 +431,7 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='[')stepRate(-1);
   else if(e.key===']')stepRate(1);
   else if(e.key.toLowerCase()==='r'&&cur)play(cur);
+  else if(e.key.toLowerCase()==='f'&&ready)stage.fullscreen();
 });
 
 /* ---------- volume (remembered, shared with the other clip page) ---------- */
@@ -467,15 +442,10 @@ let muted=pref('tmt:muted','0')==='1';
 try{localStorage.removeItem('tmt:ytcontrols')}catch(e){}  // setting from an earlier version
 const ICON_ON='<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',ICON_OFF='<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 function syncVol(){const off=muted||!vol;$('#vol').value=off?0:vol;$('#mute').innerHTML=off?ICON_OFF:ICON_ON;$('#mute').setAttribute('aria-label',off?'Unmute':'Mute')}
-function applyVol(){syncVol();if(!ready)return;yt.setVolume(vol);(muted||!vol||warm)?yt.mute():yt.unMute()}
+function applyVol(){syncVol();stage.setVolume(vol,muted||!vol)}
 $('#vol').oninput=e=>{vol=+e.target.value;muted=false;applyVol()};
 $('#vol').onchange=e=>{setPref('tmt:volume',vol);setPref('tmt:muted','0');e.target.blur()};
 $('#mute').onclick=()=>{muted=!(muted||!vol);if(!muted&&!vol)vol=50;setPref('tmt:muted',muted?'1':'0');setPref('tmt:volume',vol);applyVol()};
-// Keep the full-HD player scaled to the box
-const vidBox=document.querySelector('.vid');
-const fitPlayer=()=>vidBox.style.setProperty('--yts',vidBox.clientWidth/1920);
-try{new ResizeObserver(fitPlayer).observe(vidBox)}catch(e){addEventListener('resize',fitPlayer)}
-fitPlayer();
 
 syncVol();
 let size=57;
