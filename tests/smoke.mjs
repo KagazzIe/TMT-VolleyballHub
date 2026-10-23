@@ -208,7 +208,7 @@ await check('marker: add, line up and reorder angles', '/team/clips/marker/', as
   await p.evaluate(() => { localStorage.clear(); });
 });
 await check('clips volume and video quality', '/team/clips/', async p => {
-  await p.click('#list .clip'); await p.waitForTimeout(150);
+  await p.click('#list .clip'); await p.waitForFunction(() => stage.ready() && !stage.busy()); await p.waitForTimeout(100);
   const yt = () => p.evaluate(() => { const q = __yt.players.at(-1); return { vol: q.vol, muted: q.muted, controls: q.opts.playerVars.controls }; });
   let s = await yt();
   expect(s.controls === 0 && s.vol === 100 && !s.muted, `player should start without YouTube's controls at full volume, got ${JSON.stringify(s)}`);

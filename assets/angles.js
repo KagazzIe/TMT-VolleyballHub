@@ -240,6 +240,8 @@
     // before t muted and covered, until the sound angle reaches its best quality (6 seconds at most).
     S.start=(t,{warm:doWarm}={})=>{
       lastT=t;intent=true;
+      // Already at best quality (say, YouTube remembers a fast connection): no need to warm up
+      if(doWarm&&audio&&audio.ready&&atBest(audio))P.forEach(p=>{if(p.ready)p.warmed=true});
       const cold=doWarm&&P.some(p=>inRange(p,t)&&!p.warmed);
       if(cold){
         warm={t,t0:performance.now()};cover.hidden=false;applyAudio();
