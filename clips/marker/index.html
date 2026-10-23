@@ -18,24 +18,30 @@ button.pri,button.pri:not(:disabled):hover{background:var(--on);color:var(--onin
 header{padding:16px 14px 4px}
 header h1{font:700 30px/1 var(--font-display);margin:4px 0 0}
 .tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 14px 0}
-#url{flex:1;min-width:220px}
+#vpanel{position:absolute;z-index:20;right:14px;top:var(--vtop,120px);width:min(460px,calc(100vw - 28px));background:var(--card);border-radius:var(--r);padding:14px;box-shadow:var(--shadow);max-height:calc(100vh - 140px);overflow:auto}
+#vpanel h3{margin:14px 0 4px;font:600 13px var(--font);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+#vpanel .mut{margin:0 0 8px}
+.vrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+#vpanel input{background:var(--bg)}
+#url{flex:1;min-width:200px}
+#vempty{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center}
 #warn{display:none;background:#fff3cd;color:#3d3000;padding:8px 14px}
 main{display:grid;grid-template-columns:min(var(--pct,62%),calc(100% - 344px)) minmax(0,1fr);gap:14px;padding:14px}
 @media(max-width:900px){main{grid-template-columns:1fr}}
 .panel{background:var(--card);border-radius:var(--r);padding:12px}
 .vid{position:relative;aspect-ratio:16/9;background:#000;border-radius:var(--r-sm);overflow:hidden}
 /* The video box is a multi-angle stage from ../../assets/angles.js (layout, sync, quality, full screen) */
-#angles{margin-top:10px}
 .angrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--edge)}
 .angrow:first-of-type{border-top:0}
 .angrow .alabel{width:150px}
-.angrow .shift{font-variant-numeric:tabular-nums;color:var(--muted);min-width:92px}
+.angrow .shift{display:inline-flex;align-items:center;gap:4px;color:var(--muted)}
+.angrow .shift input{width:84px;font-variant-numeric:tabular-nums}
 .angrow button{padding:4px 9px;min-height:32px}
 .angrow .first{color:var(--muted);font-size:13px}
 .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
 .sizectl{display:flex;align-items:center;gap:6px;color:var(--muted);margin-left:auto}
 .sizectl input{width:120px;padding:0;min-height:0;border:0;background:none}
-@media(max-width:900px){.sizectl{display:none}}
+@media(max-width:900px){.sizectl{display:none}#vsetup{margin-left:auto}}
 .tag{display:inline-flex;align-items:center;gap:2px;background:var(--chip);border-radius:99px;padding:1px 3px 1px 10px;font-weight:600}
 .tag button{background:none;padding:0 6px;min-height:0;color:var(--muted)}
 dialog{background:var(--card);color:var(--ink);border:0;border-radius:var(--r);padding:16px;width:min(560px,94vw);max-height:86vh;overflow:auto;box-shadow:var(--shadow)}
@@ -74,6 +80,10 @@ textarea{width:100%;min-height:150px;margin-top:6px}
 #toast.on{opacity:1}
 #toast.err{background:var(--alert)}
 #ghStat{margin:0 0 10px}
+#editing{margin:0 0 8px;font-size:13px}
+#openlist{display:flex;flex-direction:column;gap:6px}
+#openlist button{display:flex;justify-content:space-between;gap:10px;text-align:left;font-weight:600;background:var(--bg)}
+#openlist button span{color:var(--muted);font-weight:400}
 </style>
 <script src="../../assets/github.js"></script>
 <script src="../../assets/angles.js"></script>
@@ -82,18 +92,31 @@ textarea{width:100%;min-height:150px;margin-top:6px}
 <div id="warn">YouTube blocks playback on pages opened straight from a file. Run <code>python3 -m http.server</code> in this folder and open <code>http://localhost:8000/</code>, or host it on GitHub Pages.</div>
 <header><a class="back" href="../../">&larr; TMT: Volleyball Hub</a><h1>Clip Marker</h1></header>
 <div class="tools">
-  <input id="url" placeholder="Paste a YouTube link">
-  <button id="load" class="pri">Load video</button>
-  <button id="addang" title="Add another camera angle of the same game">Add angle</button>
   <input id="gname" placeholder="Game name" aria-label="Game name" style="width:170px">
   <input id="gdate" type="date" aria-label="Game date">
   <button id="newgame">New game</button>
   <button id="hkopen">Hotkeys</button>
   <label class="sizectl">Video size <input type="range" id="size" min="40" max="80" step="1" aria-label="Video size"></label>
+  <button id="vsetup" aria-expanded="false" aria-controls="vpanel">Video setup ▾</button>
 </div>
+<!-- Video setup: kept out of the way so nobody changes videos or sync by accident. Not modal, so the
+     videos stay playable while lining up angles. -->
+<section id="vpanel" hidden aria-label="Video setup">
+  <div class="row" style="justify-content:space-between"><strong>Video setup</strong><button id="vdone" class="pri">Done</button></div>
+  <div class="vrow">
+    <input id="url" placeholder="Paste a YouTube link">
+    <button id="load" title="Use this as the game's video. A different video starts a new game.">Load video</button>
+    <button id="addang" title="Add another camera angle of the same game">Add angle</button>
+  </div>
+  <div id="angles" hidden>
+    <h3>Angles and sync</h3>
+    <p class="mut">Clips are marked once for every angle. To line an angle up, pause on a sharp moment, like a serve contact or a whistle, then nudge that angle or type its offset until it shows the same moment. A positive offset means the video started later than the first one. The first angle is the one clips open on, with its sound.</p>
+    <div id="anglist"></div>
+  </div>
+</section>
 <main>
   <section class="panel">
-    <div class="vid" id="vid"></div>
+    <div class="vid" id="vid"><div id="vempty"><button class="pri" id="vstart">Add a YouTube video</button></div></div>
     <div class="bar">
       <button id="pp" aria-label="Play or pause">▶</button>
       <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Seek">
@@ -102,11 +125,6 @@ textarea{width:100%;min-height:150px;margin-top:6px}
       <span class="vol"><button id="mute" aria-label="Mute"></button><input type="range" id="vol" min="0" max="100" step="1" aria-label="Volume"></span>
     </div>
     <button id="mark" class="pri markbtn">Mark moment (M)</button>
-    <details id="angles" hidden>
-      <summary>Angles and sync</summary>
-      <p class="mut" style="margin:8px 0 6px">Clips are marked once for every angle. To line the angles up, pause on a sharp moment, like a serve contact or a whistle, and nudge the other angle until it shows the same moment. The first angle is the one clips open on, with its sound.</p>
-      <div id="anglist"></div>
-    </details>
     <div class="keys" id="keys"></div>
     <details>
       <summary>Roster and clip length</summary>
@@ -125,15 +143,22 @@ textarea{width:100%;min-height:150px;margin-top:6px}
         <button id="ghSave" class="pri" hidden>Save to GitHub</button>
         <button id="dl" class="pri">Download JSON</button>
         <button id="cp">Copy</button>
+        <button id="open" hidden title="Edit a game that's already on your team site">Open</button>
         <button id="imp">Import</button>
         <input type="file" id="file" accept=".json" hidden>
       </span>
     </div>
+    <p id="editing" class="mut" hidden></p>
     <p id="ghStat" hidden></p>
     <div class="chips" id="chips"></div>
     <div id="list"></div>
   </section>
 </main>
+<dialog id="opendlg" aria-label="Open a game from your team site">
+  <div class="row" style="justify-content:space-between"><strong>Open a game from your team site</strong><button id="openx">Close</button></div>
+  <p class="mut" style="margin:6px 0 10px">Pick a game to change it: add an angle, fix or add marks. Save to GitHub then updates that game.</p>
+  <div id="openlist"></div>
+</dialog>
 <dialog id="hk" aria-label="Hotkeys">
   <div class="row" style="justify-content:space-between"><strong>Hotkeys and actions</strong><button id="hkx" class="pri">Done</button></div>
   <p class="mut" style="margin:6px 0 0">Click a key, then press the new key. Player keys follow each player's place in the roster.</p>
@@ -202,21 +227,24 @@ $('#addang').onclick=()=>{
   if(!id)return alert('Paste the YouTube link of the other angle first.');
   if(!S.game.videos.length){$('#load').click();return}
   if(S.game.videos.some(v=>v.id===id))return toast('That video is already an angle',2000);
-  S.game.videos.push({id,label:'',at:0});save();mountAll();$('#angles').open=true;
-  toast('Angle added. Line it up under Angles and sync.',2500);
+  S.game.videos.push({id,label:'',at:0});save();mountAll();$('#url').value='';
+  toast('Angle added. Line it up below.',2500);
 };
 // Move the game's clock so the first video starts at 0 (clip times move with it)
 function rebase(){
   const z=S.game.videos.length?S.game.videos[0].at:0;if(!z)return;
-  S.game.videos.forEach(v=>v.at=r1(v.at-z));S.clips.forEach(c=>{c.start=r1(c.start-z);c.end=r1(c.end-z)});
+  S.game.videos.forEach(v=>v.at=r2(v.at-z));S.clips.forEach(c=>{c.start=r2(c.start-z);c.end=r2(c.end-z)});
 }
 const angName=(v,i)=>v.label||'Angle '+String.fromCharCode(65+i);
+const r2=n=>Math.round(n*100)/100;
 function renderAngles(){
-  const V=S.game.videos;$('#angles').hidden=!V.length;
+  const V=S.game.videos;$('#angles').hidden=!V.length;$('#vempty').hidden=!!V.length;
+  // Don't redraw under someone typing a name or an offset
+  if($('#anglist').contains(document.activeElement)&&document.activeElement.tagName==='INPUT')return;
   const audio=stage.audioIndex();
   $('#anglist').innerHTML=V.map((v,i)=>`<div class="angrow" data-i="${i}">
     <input class="alabel" data-f="label" value="${esc(v.label)}" placeholder="${esc(angName(v,i))}" aria-label="Angle name">${i===audio&&V.length>1?'<span class="first">(sound)</span>':''}
-    ${i?`<span class="shift" title="How much later this video started than the first">${v.at>=0?'+':''}${v.at.toFixed(1)} s</span>
+    ${i?`<label class="shift" title="How much later this video started than the first, in seconds">Offset <input type="number" step="0.01" data-f="at" value="${v.at}" aria-label="Offset in seconds"> s</label>
       <button data-n="-1">−1 s</button><button data-n="-0.1">−0.1</button><button data-n="0.1">+0.1</button><button data-n="1">+1 s</button>
       <button data-a="first" title="Clips open on this angle, with its sound">Make first</button>`:'<span class="first">First angle: clips open on it</span>'}
     ${V.length>1?`<button data-a="del" aria-label="Remove this angle">✕</button>`:''}</div>`).join('');
@@ -226,17 +254,34 @@ $('#anglist').addEventListener('click',e=>{
   const i=+b.closest('.angrow').dataset.i,V=S.game.videos;
   if(b.dataset.n){
     // Nudging keeps the game time, so the other angles hold still while this one moves
-    V[i].at=r1(V[i].at+ +b.dataset.n);const t=cur();save();mountAll();stage.seek(t);
+    setOffset(i,V[i].at+ +b.dataset.n);
   }else if(b.dataset.a==='first'){V.unshift(...V.splice(i,1));rebase();save();mountAll();render()}
   else if(b.dataset.a==='del'){
     if(!confirm('Remove '+angName(V[i],i)+' from this game?'))return;
     V.splice(i,1);rebase();save();mountAll();render();
   }
 });
+// Offsets are kept to a hundredth of a second. Changing one keeps the game time, so the other angles
+// hold still while this one moves.
+function setOffset(i,v){
+  if(!Number.isFinite(v))return renderAngles();
+  S.game.videos[i].at=r2(Math.max(-86400,Math.min(86400,v)));const t=cur();save();mountAll();stage.seek(t);
+}
 $('#anglist').addEventListener('change',e=>{
-  if(e.target.dataset.f!=='label')return;
-  const i=+e.target.closest('.angrow').dataset.i;S.game.videos[i].label=e.target.value.trim();save();mountAll();
+  const f=e.target.dataset.f,i=+e.target.closest('.angrow').dataset.i;
+  if(f==='label'){S.game.videos[i].label=e.target.value.trim();save();mountAll()}
+  else if(f==='at'){e.target.blur();setOffset(i,parseFloat(e.target.value))}
 });
+// Video setup panel
+function vpanel(open){
+  const top=$('.tools').getBoundingClientRect().bottom+scrollY+6;document.documentElement.style.setProperty('--vtop',top+'px');
+  $('#vpanel').hidden=!open;$('#vsetup').setAttribute('aria-expanded',open);$('#vsetup').classList.toggle('pri',open);
+  if(open){renderAngles();if(!S.game.videos.length)$('#url').focus()}
+}
+$('#vsetup').onclick=()=>vpanel($('#vpanel').hidden);
+$('#vstart').onclick=()=>vpanel(true);
+$('#vdone').onclick=()=>vpanel(false);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#vpanel').hidden&&!$('#hk').open)vpanel(false)});
 
 /* Transport */
 function syncPP(){$('#pp').textContent=stage.playing()?'❚❚':'▶'}
@@ -359,7 +404,11 @@ function renderList(){
   </div>`).join(''):'<div class="empty">No clips yet. Load a video, then press M right after a good moment.</div>';
   document.querySelector('.clip.sel')?.scrollIntoView({block:'nearest'});
 }
-function render(){renderKeys();renderChips();renderList()}
+function renderEditing(){
+  const f=S.game.file;$('#editing').hidden=!f;
+  if(f)$('#editing').textContent='Editing '+f+' from your team site. Saving updates it.';
+}
+function render(){renderKeys();renderChips();renderList();renderEditing()}
 
 /* Hotkeys */
 const CMDS=[
@@ -494,7 +543,7 @@ $('#dl').onclick=()=>{
   if(!S.game.name&&!confirm('This game has no name yet, and the team page shows it. Download anyway?'))return;
   const b=new Blob([JSON.stringify(out(),null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(b);
-  a.download=fileName();a.click();renderList();
+  a.download=S.game.file?S.game.file.split('/').pop():fileName();a.click();renderList();
 };
 // Save to GitHub (team sites only): commits this game's file to the clips folder of the team repository.
 // A game keeps the file name it was first saved under, so renaming it later updates the same file.
@@ -519,23 +568,64 @@ $('#cp').onclick=async()=>{
   try{await navigator.clipboard.writeText(JSON.stringify(out(),null,2));toast('Copied JSON');renderList()}
   catch(e){alert('Copy was blocked by the browser. Use Download JSON instead.')}
 };
-$('#imp').onclick=()=>$('#file').click();
-$('#file').onchange=async e=>{
-  const f=e.target.files[0];if(!f)return;
-  try{
-    const d=JSON.parse(await f.text());if(!Array.isArray(d.clips))throw 0;
-    if(S.clips.length&&!confirm('Importing replaces the game you are working on. Download its JSON first if you need it. Continue?')){e.target.value='';return}
+// Load a game file into the marker. file: its path in the team repo (clips/...), so Save to GitHub updates it.
+// Returns false if the person keeps what they have.
+function loadGame(d,file,ask){
+    const g0=d.game||{};
+    // Only ask when it would throw away work: a different game, or unsaved changes to this one
+    const same=S.game.id===g0.id&&JSON.stringify(out().clips)===JSON.stringify(d.clips);
+    if(S.clips.length&&!same&&!confirm(ask))return false;
     const g=d.game||{},m=d.match||{};
     const vid=g.videoId||m.videoId||'',vids=Array.isArray(g.videos)?g.videos.filter(v=>v&&typeof v.id==='string'&&v.id).map(v=>({id:v.id,label:typeof v.label==='string'?v.label:'',at:Number.isFinite(+v.at)?+v.at:0})):[];
     S.game={id:g.id||newId(),name:g.name||m.title||'',date:g.date||m.date||'',videos:vids.length?vids:vid?[{id:vid,label:'',at:0}]:[]};
+    if(file)S.game.file=file;
     if(Array.isArray(d.roster)&&d.roster.length)S.roster=d.roster;
     S.clips=d.clips.map(c=>{const p=Array.isArray(c.players)?c.players:(c.player?[c.player]:[]);const{player,...r}=c;return{...r,players:p}});sel=null;save();render();
     $('#gname').value=S.game.name||'';$('#gdate').value=S.game.date||'';$('#roster').value=S.roster.join('\n');
     $('#url').value=firstId()?'https://www.youtube.com/watch?v='+firstId():'';
     rebase();save();render();mountAll();
+    return true;
+}
+$('#imp').onclick=()=>$('#file').click();
+$('#file').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const d=JSON.parse(await f.text());if(!Array.isArray(d.clips))throw 0;
+    loadGame(d,null,'Importing replaces the game you are working on. Download its JSON first if you need it. Continue?');
   }catch(_){alert('That file is not a clip export from this tool.')}
   e.target.value='';
 };
+// Open a game from the team site (the files the clip viewer shows)
+const okFile=f=>typeof f==='string'&&/^[\w.-]+\.json$/.test(f)&&f!=='index.json';
+let TEAM_FILES=[];
+async function teamGame(f){const r=await fetch('../../team/clips/'+encodeURIComponent(f),{cache:'no-cache'});if(!r.ok)throw 0;const d=await r.json();if(!Array.isArray(d.clips))throw 0;return d}
+async function openTeamGame(f){
+  try{
+    const d=await teamGame(f);
+    if(loadGame(d,'clips/'+f,'Opening '+((d.game&&d.game.name)||f)+' replaces the game you are working on. Download or save it first if you need it. Continue?')){
+      $('#opendlg').open&&$('#opendlg').close();toast('Opened '+(S.game.name||f),2000);
+    }
+  }catch(e){toast("Couldn't open that game",3000,true)}
+}
+fetch('../../team/clips/index.json',{cache:'no-cache'}).then(r=>r.ok?r.json():[]).then(l=>{
+  TEAM_FILES=(Array.isArray(l)?l:[]).map(n=>typeof n==='string'?n:n&&n.file).filter(okFile);
+  $('#open').hidden=!TEAM_FILES.length;
+}).catch(()=>{});
+$('#open').onclick=async()=>{
+  $('#openlist').innerHTML='<p class="mut">Loading…</p>';$('#opendlg').showModal();
+  const rows=await Promise.all(TEAM_FILES.map(f=>teamGame(f).then(d=>({f,d})).catch(()=>null)));
+  $('#openlist').innerHTML=rows.filter(Boolean).sort((a,b)=>String(b.d.game&&b.d.game.date).localeCompare(String(a.d.game&&a.d.game.date))).map(({f,d})=>{
+    const g=d.game||{},n=(Array.isArray(g.videos)?g.videos.length:0)||1;
+    return `<button data-f="${esc(f)}">${esc(g.name||f)}<span>${esc(g.date||'')} · ${d.clips.length} clips${n>1?' · '+n+' angles':''}</span></button>`;
+  }).join('')||'<p class="mut">No games on your team site yet.</p>';
+};
+$('#openlist').addEventListener('click',e=>{const b=e.target.closest('button[data-f]');if(b)openTeamGame(b.dataset.f)});
+$('#openx').onclick=()=>$('#opendlg').close();
+// The clip viewer's "Edit game" links open a game here: ?edit=<file>
+{
+  const f=new URLSearchParams(location.search).get('edit');
+  if(okFile(f)){try{history.replaceState(null,'',location.pathname)}catch(e){}openTeamGame(f)}
+}
 render();
 if(S.game.videos.length)mountAll();
 // Use the team roster from the team data folder until a roster is set here

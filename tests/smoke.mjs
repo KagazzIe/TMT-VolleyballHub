@@ -182,17 +182,28 @@ await check('clips: several angles of one game', '/team/clips/', async p => {
   expect(!fs.on && fs.controls === 0, `leaving full screen should drop YouTube's controls, got ${JSON.stringify(fs)}`);
 });
 await check('marker: add, line up and reorder angles', '/team/clips/marker/', async p => {
+  // Video setup is behind a button, and the empty player offers it too
+  expect(!(await p.isVisible('#url')) && await p.isVisible('#vstart'), 'video setup should be tucked away, with a start button on the empty player');
+  await p.click('#vstart');
   await p.fill('#url', 'https://youtu.be/angleAAAAAA'); await p.click('#load'); await p.waitForTimeout(200);
+  expect(!(await p.isVisible('#vstart')), 'the start button should go once a video is loaded');
   await p.fill('#url', 'https://www.youtube.com/watch?v=angleBBBBBB'); await p.click('#addang'); await p.waitForTimeout(300);
   expect(await p.evaluate(() => stage.players().length === 2 && S.game.videos.map(v => v.id).join() === 'angleAAAAAA,angleBBBBBB'), 'Add angle should add the second video');
   await p.evaluate(() => { stage.seek(50); }); await p.click('#mark');
   await p.click('#anglist .angrow[data-i="1"] [data-n="1"]'); await p.click('#anglist .angrow[data-i="1"] [data-n="0.1"]');
   let g = await p.evaluate(() => ({ at: S.game.videos[1].at, start: S.clips[0].start }));
   expect(g.at === 1.1, `nudging should move the angle on the game clock, got ${JSON.stringify(g)}`);
+  // Type an exact offset (hundredths of a second); the angle's player follows
+  await p.fill('#anglist .angrow[data-i="1"] [data-f="at"]', '1.37'); await p.press('#anglist .angrow[data-i="1"] [data-f="at"]', 'Enter'); await p.waitForTimeout(400);
+  g = await p.evaluate(() => ({ at: S.game.videos[1].at, start: S.clips[0].start, t: stage.players()[1].yt.getCurrentTime(), game: stage.time() }));
+  expect(g.at === 1.37 && Math.abs(g.t - (g.game - 1.37)) < 0.01, `typed offset should apply exactly, got ${JSON.stringify(g)}`);
+  await p.press('body', 'Escape');
+  expect(!(await p.isVisible('#vpanel')), 'Esc should close video setup');
+  await p.click('#vsetup');
   // Make B first: the game's clock now starts with B, and clip times move with it
   await p.click('#anglist .angrow[data-i="1"] [data-a="first"]');
   const r = await p.evaluate(() => ({ ids: S.game.videos.map(v => v.id + '@' + v.at).join(), start: S.clips[0].start, out: out() }));
-  expect(r.ids === 'angleBBBBBB@0,angleAAAAAA@-1.1' && Math.abs(r.start - (g.start - 1.1)) < 0.05, `Make first should rebase the clock, got ${JSON.stringify(r)}`);
+  expect(r.ids === 'angleBBBBBB@0,angleAAAAAA@-1.37' && Math.abs(r.start - (g.start - 1.37)) < 0.01, `Make first should rebase the clock, got ${JSON.stringify(r)}`);
   expect(r.out.version === 4 && r.out.game.videoId === 'angleBBBBBB' && r.out.game.videos.length === 2, 'export should list the angles, first one as videoId');
   await p.evaluate(() => { localStorage.clear(); });
 });
@@ -210,7 +221,7 @@ await check('clips volume and video quality', '/team/clips/', async p => {
 });
 await check('marker shares volume and uses the full-HD player', '/team/clips/marker/', async p => {
   expect((await p.inputValue('#vol')) === '30', 'volume from the clips page should carry over');
-  await p.fill('#url', 'https://www.youtube.com/watch?v=M7lc1UVf-VE'); await p.click('#load'); await p.waitForTimeout(150);
+  await p.click('#vsetup'); await p.fill('#url', 'https://www.youtube.com/watch?v=M7lc1UVf-VE'); await p.click('#load'); await p.waitForTimeout(150);
   const s = await p.evaluate(() => { const q = __yt.players.at(-1), fr = document.querySelector('.vid iframe'); return { controls: q.opts.playerVars.controls, vol: q.vol, w: fr.offsetWidth }; });
   expect(s.controls === 0 && s.vol === 30 && s.w === 1920, `marker player should be full-HD layout at the saved volume, got ${JSON.stringify(s)}`);
 });
@@ -401,7 +412,7 @@ await check('marker saves a game to GitHub', '/team/clips/marker/', async p => {
   GH.files = {}; GH.puts = [];
   await p.evaluate(c => localStorage.setItem('tmt:github@/team/', c), CONN);
   await p.reload(); await p.waitForTimeout(600);
-  await p.fill('#url', 'https://www.youtube.com/watch?v=M7lc1UVf-VE'); await p.click('#load'); await p.waitForTimeout(150);
+  await p.click('#vsetup'); await p.fill('#url', 'https://www.youtube.com/watch?v=M7lc1UVf-VE'); await p.click('#load'); await p.click('#vdone'); await p.waitForTimeout(150);
   await p.fill('#gname', 'Saved Game'); await p.fill('#gdate', '2026-02-01');
   await p.click('#mark');
   await p.click('#ghSave'); await p.waitForTimeout(300);
@@ -417,6 +428,36 @@ await check('marker saves a game to GitHub', '/team/clips/marker/', async p => {
   await p.click('#ghSave'); await p.waitForTimeout(300);
   expect((await p.innerText('#toast')).includes('stopped working'), `expired token should be explained, got ${await p.innerText('#toast')}`);
   expect(await p.evaluate(() => !TMTGitHub.connected && !localStorage.getItem('tmt:github@/team/')), 'expired token should be forgotten');
+  await p.evaluate(() => localStorage.clear());
+});
+
+// Editing a published game: viewer link -> Clip Marker -> add an angle -> save to the same file
+await check('edit a team game in Clip Marker', '/team/clips/', async p => {
+  await p.click('#list .clip'); await p.waitForTimeout(200);
+  const href = await p.getAttribute('#now a.edit', 'href');
+  expect(href === 'marker/?edit=2026-01-10-sample-game.json', `viewer should link the game to Clip Marker, got ${href}`);
+  await p.evaluate(() => localStorage.setItem('tmt:github@/team/', JSON.stringify({ token: 'github_pat_sample', login: 'sample-captain', repo: 'sample-owner/sample-team' })));
+  await p.goto(BASE + '/team/clips/' + href); await p.waitForTimeout(800);
+  const s = await p.evaluate(() => ({ file: S.game.file, clips: S.clips.length, url: location.search, editing: document.getElementById('editing').textContent }));
+  expect(s.file === 'clips/2026-01-10-sample-game.json' && s.clips === 6 && s.url === '' && s.editing.includes('clips/2026-01-10-sample-game.json'),
+    `Clip Marker should open the team game for editing, got ${JSON.stringify(s)}`);
+  // Add an angle and save: it updates the same file, now with two videos
+  const fixture = fs.readFileSync(path.join(FIXTURE, 'clips', '2026-01-10-sample-game.json'), 'utf8');
+  GH.files = { 'clips/2026-01-10-sample-game.json': { text: fixture, sha: 'old' } }; GH.puts = [];
+  await p.click('#vsetup'); await p.fill('#url', 'https://youtu.be/angleBBBBBB'); await p.click('#addang'); await p.click('#vdone'); await p.waitForTimeout(200);
+  await p.click('#ghSave'); await p.waitForTimeout(400);
+  const saved = JSON.parse(GH.files['clips/2026-01-10-sample-game.json'].text);
+  expect(Object.keys(GH.files).length === 1 && saved.version === 4 && saved.game.videos.length === 2 && saved.clips.length === 6 && GH.puts[0].message.startsWith('Update'),
+    `saving should update the same team file with the new angle, got ${Object.keys(GH.files)} ${JSON.stringify(saved.game)}`);
+  // The Open button lists team games
+  await p.click('#open'); await p.waitForTimeout(400);
+  const list = await p.$$eval('#openlist button', b => b.map(x => x.dataset.f));
+  expect(list.join() === '2026-01-10-sample-game.json', `Open should list the team's games, got ${list}`);
+  // Opening another game over unsaved work asks first
+  await p.evaluate(() => { S.clips[0].note = 'unsaved change'; });
+  let asked = ''; p.once('dialog', d => { asked = d.message(); d.dismiss(); });
+  await p.click('#openlist button'); await p.waitForTimeout(400);
+  expect(asked.includes('replaces the game') && (await p.evaluate(() => S.clips[0].note)) === 'unsaved change', `should ask before replacing unsaved work, got "${asked}"`);
   await p.evaluate(() => localStorage.clear());
 });
 

@@ -58,6 +58,8 @@ main>*{min-width:0}
 #list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .gh{margin:12px 0 0;font:700 19px/1.1 var(--font-display)}
 .gh .mut{font:600 14px var(--font)}
+.edit{color:var(--accent);font:600 13px var(--font);margin-left:10px;text-decoration:none}
+.edit:hover{text-decoration:underline}
 .clip{background:var(--card);border-radius:var(--r);padding:10px 12px;cursor:pointer;box-shadow:inset 0 0 0 2px transparent;scroll-margin-top:var(--stageh,300px)}
 .clip:hover{box-shadow:inset 0 0 0 2px var(--edge)}
 .clip.sel{box-shadow:inset 0 0 0 2px var(--on)}
@@ -149,7 +151,8 @@ if(location.protocol==='file:')$('#warn').hidden=false;
 let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),1400)};
 
 /* ---------- data: one JSON file per game ---------- */
-function ingest(d){
+// file: the game's file name on the team site, so it can be opened in Clip Marker to edit
+function ingest(d,file){
   if(!d||!Array.isArray(d.clips))return false;
   const g=d.game||{},m=d.match||{};
   // Version 4 games list their videos (angles), each with where it starts on the game's clock (at).
@@ -160,7 +163,7 @@ function ingest(d){
   const gid=g.id||('legacy-'+vid+'-'+(date||name));
   // first: when the game's first clip starts, to order several games cut from one video
   const starts=d.clips.map(c=>+c.start).filter(Number.isFinite);
-  GAMES[gid]={id:gid,name,date,vid,videos:vids.length?vids:[{id:vid,label:'',at:0}],first:starts.length?Math.min(...starts):Infinity};
+  GAMES[gid]={id:gid,name,date,vid,file:file||null,videos:vids.length?vids:[{id:vid,label:'',at:0}],first:starts.length?Math.min(...starts):Infinity};
   (d.roster||[]).forEach(n=>{if(!ROSTER.includes(n))ROSTER.push(n)});
   CLIPS=CLIPS.filter(c=>c.gid!==gid);
   d.clips.forEach(c=>{
@@ -205,7 +208,8 @@ async function loadIndex(){
   try{
     const r=await fetch('../team/clips/index.json',{cache:'no-cache'});if(!r.ok)throw 0;
     for(const n of await r.json()){
-      try{ingest(await (await fetch('../team/clips/'+(typeof n==='string'?n:n.file),{cache:'no-cache'})).json())}catch(e){}
+      const f=typeof n==='string'?n:n.file;
+      try{ingest(await (await fetch('../team/clips/'+f,{cache:'no-cache'})).json(),f)}catch(e){}
     }
   }catch(e){}
   afterLoad();
@@ -295,6 +299,8 @@ function renderHead(){
   $('#sub').textContent=!n?'':one?`${one.name}${one.date?', '+fmtDate(one.date):''}: ${n} clips`:`${n} clips across ${GAME_ORDER.length} games`;
 }
 const who=c=>c.players.length?' ('+esc(c.players.join(', '))+')':` <span class="mut">(${NOBODY})</span>`;
+// Games from the team site can be opened in Clip Marker to change marks or add an angle
+const editLink=g=>g&&g.file?`<a class="edit" href="marker/?edit=${encodeURIComponent(g.file)}" title="Open this game in Clip Marker">Edit game</a>`:'';
 const card=c=>`<article class="clip ${cur&&cur.key===c.key?'sel':''}" data-key="${esc(c.key)}" tabindex="0">
   <div class="top"><span><b>${esc(c.action||'Play')}</b>${who(c)}</span><span class="acts"><button class="copy" data-copy="${esc(c.key)}" title="Copy a YouTube link that starts at this moment">Copy link</button><span class="t">${fmt(c.start)}</span></span></div>
   ${c.note?`<div class="note">${esc(c.note)}</div>`:''}</article>`;
@@ -310,14 +316,14 @@ function renderList(){
   if(!v.length){$('#list').innerHTML='<div class="empty">No clips match these filters.</div>';return}
   let html='',last=null;
   v.forEach(c=>{
-    if(GAME_ORDER.length>1&&c.gid!==last){const g=GAMES[c.gid];html+=`<h3 class="gh">${esc(g.name)}${g.date?` <span class="mut">${esc(fmtDate(g.date))}</span>`:''}</h3>`;last=c.gid}
+    if(GAME_ORDER.length>1&&c.gid!==last){const g=GAMES[c.gid];html+=`<h3 class="gh">${esc(g.name)}${g.date?` <span class="mut">${esc(fmtDate(g.date))}</span>`:''}${editLink(g)}</h3>`;last=c.gid}
     html+=card(c);
   });
   $('#list').innerHTML=html;
 }
 function renderNow(){
   const g=cur&&GAME_ORDER.length>1?GAMES[cur.gid]:null;
-  $('#now').innerHTML=cur?`<div class="top"><span><b>${esc(cur.action||'Play')}</b>${who(cur)}</span>${g?`<span class="mut small">${esc(g.name)}</span>`:''}</div>${cur.note?`<div class="note">${esc(cur.note)}</div>`:''}`:'';
+  $('#now').innerHTML=cur?`<div class="top"><span><b>${esc(cur.action||'Play')}</b>${who(cur)}</span>${g?`<span class="mut small">${esc(g.name)}</span>`:''}${editLink(GAMES[cur.gid])}</div>${cur.note?`<div class="note">${esc(cur.note)}</div>`:''}`:'';
 }
 function render(){renderHead();renderFilters();renderList();renderNow();if(!ready&&!ended)showOver('idle')}
 function markSel(){document.querySelectorAll('.clip').forEach(x=>x.classList.toggle('sel',!!cur&&x.dataset.key===cur.key));document.querySelector('.clip.sel')?.scrollIntoView({block:'nearest',behavior:'smooth'})}
