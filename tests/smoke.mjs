@@ -130,12 +130,26 @@ await check('clips: games from one video sort by where they start', '/team/clips
     const game = (id, name, vid, start) => ({ game: { id, name, date: '2026-02-01', videoId: vid }, clips: [{ id: 'c' + id, start, end: start + 5, players: [], action: 'Serve' }] });
     ingest(game('g1', 'Match A', 'vid-one-aaa', 900)); ingest(game('g2', 'Match B', 'vid-one-aaa', 100));
     ingest(game('g3', 'Match C', 'vid-two-bbb', 50)); ingest(game('g0', 'Match 0', 'vid-two-bbb', 2000));
-    sortAll(); const old = GAME_ORDER.filter(g => /^g\d$/.test(g));
-    F.order = 'new'; sortAll(); const neu = GAME_ORDER.filter(g => /^g\d$/.test(g)); F.order = 'old';
-    return { old: old.join(), neu: neu.join() };
+    const dflt = F.order;
+    F.order = 'old'; sortAll(); const old = GAME_ORDER.filter(g => /^g\d$/.test(g));
+    F.order = 'new'; sortAll(); const neu = GAME_ORDER.filter(g => /^g\d$/.test(g));
+    return { old: old.join(), neu: neu.join(), dflt, url: (setUrl(), location.search) };
   });
   // Same video: by first clip (B before A, C before 0). Videos on the same day: by their first game name ('Match 0' < 'Match A')
   expect(order.old === 'g3,g0,g2,g1' && order.neu === 'g1,g2,g0,g3', `unexpected game order ${JSON.stringify(order)}`);
+  expect(order.dflt === 'new' && !order.url.includes('order='), `newest first should be the default and need nothing in the link, got ${JSON.stringify(order)}`);
+  await p.evaluate(() => { F.order = 'old'; });
+  // Games sharing angles are one recording, whichever angle a game opens on. Here angle Y started 5 s
+  // after X; h2 opens on Y. In X's time: h1 560, h3 1556, h2 1553 + 5 = 1558.
+  const rec = await p.evaluate(() => {
+    const game = (id, name, videos, start) => ({ version: 4, game: { id, name, date: '2026-02-02', videoId: videos[0].id, videos }, clips: [{ id: 'c' + id, start, end: start + 5, players: [], action: 'Serve' }] });
+    const X = 'vidXXXXXXXX', Y = 'vidYYYYYYYY';
+    ingest(game('h2', 'Game 2', [{ id: Y, at: 0 }, { id: X, at: -5 }], 1553));
+    ingest(game('h1', 'Game 1', [{ id: X, at: 0 }, { id: Y, at: 5 }], 560));
+    ingest(game('h3', 'Game 3', [{ id: X, at: 0 }, { id: Y, at: 5 }], 1556));
+    sortAll(); return GAME_ORDER.filter(g => /^h\d$/.test(g)).join();
+  });
+  expect(rec === 'h1,h3,h2', `games sharing angles should sort by time in the recording, got ${rec}`);
 });
 await check('clips warm up to HD before the first clip', '/team/clips/', async p => {
   await p.evaluate(() => { window.__ytQuality = 'medium'; });

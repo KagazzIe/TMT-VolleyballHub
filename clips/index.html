@@ -148,7 +148,7 @@ const hasP=(c,p)=>p===NOBODY?!c.players.length:c.players.includes(p);
 const ALIAS={Spike:'Hit'};
 let GAMES={},GAME_ORDER=[],CLIPS=[],ROSTER=[];
 const Q=new URLSearchParams(location.search);
-const F={games:Q.getAll('game').length?new Set(Q.getAll('game')):null,players:new Set(Q.getAll('player')),actions:new Set(Q.getAll('action')),all:Q.get('all')==='1',q:Q.get('q')||'',order:Q.get('order')==='new'?'new':'old'};
+const F={games:Q.getAll('game').length?new Set(Q.getAll('game')):null,players:new Set(Q.getAll('player')),actions:new Set(Q.getAll('action')),all:Q.get('all')==='1',q:Q.get('q')||'',order:Q.get('order')==='old'?'old':'new'};  // newest games first unless the link asks for oldest
 if(F.actions.delete('Missed Receives')){F.actions.add('Receive');F.players.add(NOBODY)}
 let cur=null,ready=false,ended=false,armed=0,prevT=0,dragging=false;
 if(location.protocol==='file:')$('#warn').hidden=false;
@@ -179,15 +179,29 @@ function ingest(d,file){
 }
 function sortAll(){
   const dir=F.order==='new'?-1:1,num=new Intl.Collator(undefined,{numeric:true});
-  // On one date, games cut from the same video stay together in the order they happen in it.
-  // Different videos on that date go by the first name among their games.
-  const vkey=g=>g.date+'|'+g.vid,first={};
-  Object.values(GAMES).forEach(g=>{const k=vkey(g);if(!(k in first)||num.compare(g.name,first[k])<0)first[k]=g.name});
+  // On one date, games that share any video are one recording: they stay together in the order they
+  // happen in it, whichever angle each game opens on. Each game's first clip is placed on the video the
+  // most games in that recording share (video time = game time - at). Recordings with no video in
+  // common go by the first name among their games.
+  const G=Object.values(GAMES),rec={};
+  const root=g=>{while(rec[g.id]!==g.id)g=GAMES[rec[g.id]];return g.id};
+  G.forEach(g=>rec[g.id]=g.id);
+  G.forEach(a=>G.forEach(b=>{
+    if(a.date===b.date&&a.videos.some(v=>b.videos.some(w=>w.id===v.id))){const ra=root(a),rb=root(b);if(ra!==rb)rec[ra]=rb}
+  }));
+  const groups={};G.forEach(g=>(groups[root(g)]=groups[root(g)]||[]).push(g));
+  const key={},firstName={},place={};
+  Object.entries(groups).forEach(([r,gs])=>{
+    const count={};gs.forEach(g=>g.videos.forEach(v=>count[v.id]=(count[v.id]||0)+1));
+    const ref=Object.keys(count).sort((x,y)=>count[y]-count[x]||(x<y?-1:1))[0];
+    firstName[r]=gs.map(g=>g.name).sort(num.compare)[0];
+    gs.forEach(g=>{key[g.id]=r;const v=g.videos.find(v=>v.id===ref);place[g.id]=v?g.first-v.at:g.first});
+  });
   GAME_ORDER=Object.keys(GAMES).sort((a,b)=>{
     const A=GAMES[a],B=GAMES[b],da=A.date,db=B.date;
     if(da!==db){if(!da)return 1;if(!db)return -1;return da<db?-dir:dir}
-    if(A.vid!==B.vid)return dir*(num.compare(first[vkey(A)],first[vkey(B)])||(A.vid<B.vid?-1:1));
-    if(A.first!==B.first)return dir*(A.first<B.first?-1:1);
+    if(key[a]!==key[b])return dir*(num.compare(firstName[key[a]],firstName[key[b]])||(key[a]<key[b]?-1:1));
+    if(place[a]!==place[b])return dir*(place[a]<place[b]?-1:1);
     return dir*num.compare(A.name,B.name);
   });
   CLIPS.sort((a,b)=>GAME_ORDER.indexOf(a.gid)-GAME_ORDER.indexOf(b.gid)||a.start-b.start);
@@ -258,7 +272,7 @@ function renderGames(){
     <div class="gtools"><button data-g="all">Select all</button><button data-g="none">Select none</button></div>
     ${GAME_ORDER.map(g=>`<label class="grow"><input type="checkbox" data-g="${esc(g)}" ${gameOn(g)?'checked':''}><span class="gn">${esc(GAMES[g].name)}</span><span class="mut small">${esc(fmtDate(GAMES[g].date))}</span><b>${gf.filter(c=>c.gid===g).length}</b></label>`).join('')}
   </div></details>
-  <div class="seg">Order <button data-ord="old" class="${F.order==='old'?'on':''}">Oldest first</button><button data-ord="new" class="${F.order==='new'?'on':''}">Newest first</button></div></div>`;
+  <div class="seg">Order <button data-ord="new" class="${F.order==='new'?'on':''}">Newest first</button><button data-ord="old" class="${F.order==='old'?'on':''}">Oldest first</button></div></div>`;
   if($('#gpanel'))$('#gpanel').scrollTop=sc;
 }
 $('#games').addEventListener('click',e=>{
@@ -367,7 +381,7 @@ new ResizeObserver(()=>document.documentElement.style.setProperty('--stageh',$('
 function viewQuery(withClip){
   const q=new URLSearchParams();
   if(F.games)F.games.forEach(v=>q.append('game',v));F.players.forEach(v=>q.append('player',v));F.actions.forEach(v=>q.append('action',v));
-  if(F.all&&F.players.size>1)q.set('all','1');if(F.q)q.set('q',F.q);if(F.order==='new')q.set('order','new');
+  if(F.all&&F.players.size>1)q.set('all','1');if(F.q)q.set('q',F.q);if(F.order==='old')q.set('order','old');
   if(withClip&&cur)q.set('clip',cur.key);
   return q.toString();
 }
