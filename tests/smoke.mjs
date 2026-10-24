@@ -180,6 +180,19 @@ await check('clips: several angles of one game', '/team/clips/', async p => {
   await p.click('.ang-tools [data-a="fs"]'); await p.waitForTimeout(400);
   fs = await p.evaluate(() => { const q = __yt.players.at(-1); return { on: stage.isFullscreen(), controls: q.opts.playerVars.controls }; });
   expect(!fs.on && fs.controls === 0, `leaving full screen should drop YouTube's controls, got ${JSON.stringify(fs)}`);
+  // Copy link on a two-angle clip offers each perspective
+  await p.evaluate(() => { window.__copied = []; copyText = t => { __copied.push(t); }; });
+  const menuBtn = '[data-copymenu="two:c1"]';
+  for (const ang of [1, 0]) {
+    await p.click(menuBtn);
+    const items = await p.$$eval('.copymenu button', b => b.map(x => x.textContent));
+    expect(items.join() === 'Court,End line', `menu should list the angles by name, got ${items}`);
+    await p.click(`.copymenu [data-ang="${ang}"]`);
+  }
+  const copied = await p.evaluate(() => __copied);
+  expect(copied[0] === 'https://www.youtube.com/watch?v=angleBBBBBB&t=95s' && copied[1] === 'https://www.youtube.com/watch?v=angleAAAAAA&t=100s' && !(await p.isVisible('.copymenu')),
+    `each angle should copy its own link at the right time, got ${JSON.stringify(copied)}`);
+  expect((await p.evaluate(() => cur.key)) === 'two:c1', 'using the menu should not change the playing clip');
 });
 await check('marker: add, line up and reorder angles', '/team/clips/marker/', async p => {
   // Video setup is behind a button, and the empty player offers it too
