@@ -38,12 +38,8 @@ this repository, and it expires after a year. To stop using it, click **Disconne
 button, or delete it on GitHub under **Settings → Developer settings → Personal access tokens**.
 
 Only this repository's owner can make the token, unless the repository belongs to a GitHub
-organization. Anyone else can still use the upload way below.
-
-**Several people saving?** Put this repository in a free GitHub organization. Each helper joins the
-organization and gets **Write** access to this repository, then makes their own token the same way
-(the token page already picks the organization). An organization owner may need to approve each token
-under the organization's **Settings → Personal access tokens → Pending requests**.
+organization. Anyone else can still use the upload way below, or see
+[Letting several people save](#letting-several-people-save).
 
 ### The upload way
 
@@ -57,6 +53,67 @@ Download a file from your hub, then upload it here.
 Your site updates about two minutes later. To watch, open the **Actions** tab: a yellow dot means
 it's working, a green check means it's done. If the page still looks old, refresh it with
 **Ctrl+F5** (Windows) or **Cmd+Shift+R** (Mac).
+
+## Letting several people save
+
+GitHub only lets other people make a Save to GitHub token for a repository that belongs to an
+**organization**. Organizations are free, and you stay in charge: you choose who can save, and you can
+approve or cancel each person's token. If your repository is under your own account, move it into an
+organization once. Your site's address changes to `https://ORGANIZATION.github.io/THIS-REPOSITORY-NAME/`.
+
+### 1. Create the organization (you, once)
+1. Open [GitHub's new organization page](https://github.com/account/organizations/new?plan=free) and
+   choose the **Free** plan.
+2. Pick a short name, like `team-name-volleyball`. It becomes the start of your site's address.
+3. Enter your email, choose **My personal account**, and finish.
+
+### 2. Choose how tokens are allowed (you, once)
+In the organization, open **Settings**, then **Personal access tokens → Settings** (under "Third-party Access"):
+1. **Fine-grained tokens:** choose **Allow access via fine-grained personal access tokens**, and
+   **Require administrator approval**. Click **Save**.
+2. **Personal access tokens (classic):** choose **Restrict access via personal access tokens (classic)**.
+   Click **Save**.
+
+Also check **Settings → Actions → General** says **Allow all actions and reusable workflows**, so your
+site can still build.
+
+### 3. Move this repository into the organization (you, once)
+Skip this if you made the repository in the organization to begin with.
+1. In this repository, open **Settings**, scroll to the bottom, and click **Transfer ownership**.
+2. Choose your organization, type the repository's name, and confirm.
+3. Open **Settings → Pages** and make sure **Source** says **GitHub Actions**.
+4. Open **Actions → Deploy team hub → Run workflow** and click the green button. After about two
+   minutes, your site is at its new address. The old address stops working, so share the new one.
+
+Your own Save to GitHub token stops working after the move. Click Save to GitHub on the new site and
+connect again; the token page now picks the organization for you.
+
+Finish or save any Clip Marker game in progress before you move: your browser keeps unsaved work
+per site address, so the new address starts empty.
+
+### 4. Add your helpers
+1. Organization **Settings → Member privileges → Base permissions**: choose **Read**, so people can
+   only save to repositories you pick.
+2. **People → Invite member**: invite each helper by GitHub name or email, as a **Member**. They
+   need a free GitHub account and must accept the email invitation.
+3. **Teams → New team**: call it something like `Taggers`, and add your helpers to it.
+4. In the team, open **Repositories → Add repository**, pick this repository, and give it **Write**.
+
+### 5. Helpers connect, you approve
+1. Each helper opens your site, clicks **Save to GitHub**, and follows the same steps as above.
+   The token page already chooses the organization; they pick this repository under
+   **Repository access**.
+2. You get an email. Open organization **Settings → Personal access tokens → Pending requests**,
+   check the request is for this repository only, and click **Approve**. Until then, their saves say
+   the token can't change files.
+3. To take away someone's access, open **Personal access tokens → Active tokens** and revoke their token,
+   or remove them from the team.
+
+### When two people edit the same game
+Clip Marker remembers which version of a game you opened. If someone else saved that game on GitHub
+since then, Save to GitHub asks before replacing it, and says how many clips each version has. Choose
+**Cancel** to keep both: click **Download JSON** to keep your version, then **Open** the newer game and
+add your clips to it. Easiest is to split the work so each person tags different games.
 
 ## If something goes wrong
 

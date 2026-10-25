@@ -23,6 +23,9 @@ GitHub hosts your team's site for free.
 3. Give it a short name, like `volleyball`. It becomes part of your site's address.
 4. Choose **Public**, then click **Create repository**.
 
+If several people will save clips or data, choose a free GitHub organization as the **Owner** here
+(see [More than one person saving](#more-than-one-person-saving)).
+
 ### 2. Turn on your website
 1. In your new repository, click **Settings** (along the top), then **Pages** (on the left).
 2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
@@ -58,6 +61,21 @@ Or download the file and upload it to your repository yourself (**Add file → U
 | Team name, players or play labels | **Team Setup** | `team.json` |
 | Rotation positions, arrows, highlights and notes | **5-1 Rotation Guide → Edit positions** | `rotations.json` |
 | Add a match | **Clip Marker** (**Video setup → Add angle** for more cameras of the same game; **Open** to edit a game later) | the game file, in the `clips` folder |
+
+### More than one person saving
+GitHub only lets other people make a Save to GitHub token for a repository owned by an **organization**,
+not by someone's personal account. Organizations are free. In short:
+
+1. Create a free organization and set its token policy to allow fine-grained tokens with your approval.
+2. Make your team repository in it, or move an existing one there (**Settings → Transfer ownership**).
+   Your site's address becomes `https://ORGANIZATION.github.io/REPOSITORY/`.
+3. Invite your helpers, put them in a team (for example `Taggers`), and give that team **Write** on the repository.
+4. Each helper connects Save to GitHub with their own token; you approve it under the organization's
+   **Settings → Personal access tokens → Pending requests**.
+
+Your team repository's front page has every click:
+[Letting several people save](https://github.com/KagazzIe/TMT-VolleyballHub-team-template#letting-several-people-save).
+If two people edit the same game, Clip Marker asks before replacing the other person's newer save.
 
 You can try the rotation editor and Clip Marker on the [demo site](https://kagazzie.github.io/TMT-VolleyballHub/)
 first. Nothing changes on any team's site until a file is saved or uploaded.
