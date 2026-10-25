@@ -539,6 +539,9 @@ function out(){
 }
 const slug=t=>t.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const fileName=()=>[S.game.date,slug(S.game.name||'')||S.game.id].filter(Boolean).join('-')+'.json';
+// Fingerprint of a game file's content. S.game.base is the fingerprint of the team file this game was
+// opened from or last saved as, so Save to GitHub can tell when someone else changed it since.
+const fp=d=>{const s=JSON.stringify(d);let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return s.length+'.'+(h>>>0).toString(36)};
 $('#dl').onclick=()=>{
   if(!S.game.name&&!confirm('This game has no name yet, and the team page shows it. Download anyway?'))return;
   const b=new Blob([JSON.stringify(out(),null,2)],{type:'application/json'});
@@ -554,13 +557,18 @@ TMTGitHub.ready.then(site=>{
 $('#ghSave').onclick=async()=>{
   if(!S.clips.length)return toast('Mark some clips first');
   if(!S.game.name&&!confirm('This game has no name yet, and the team page shows it. Save anyway?'))return;
-  const b=$('#ghSave'),gid=S.game.id,path=S.game.file||'clips/'+fileName(),isNew=!S.game.file;
+  const b=$('#ghSave'),gid=S.game.id,base=S.game.base,path=S.game.file||'clips/'+fileName(),isNew=!S.game.file;
+  const text=JSON.stringify(out(),null,2)+'\n',mine=S.clips.length;
+  const parse=t=>{try{const d=JSON.parse(t);return d&&d.game&&Array.isArray(d.clips)?d:null}catch(e){return null}};
   b.disabled=true;
   try{
-    const r=await TMTGitHub.save({path,text:JSON.stringify(out(),null,2)+'\n',message:(isNew?'Add ':'Update ')+path+' from Clip Marker',
-      isSafe:remote=>{try{return JSON.parse(remote).game.id===gid}catch(e){return false}},
-      conflict:`There's already a different game saved as ${path}. Replace it with this one?`});
-    if(r){if(S.game.id===gid){S.game.file=path;save()}toast('Saved to GitHub. The team page updates in about two minutes.',3500);renderList()}
+    // Replacing is fine only when GitHub still has the version this game was opened from or last saved as
+    const r=await TMTGitHub.save({path,text,message:(isNew?'Add ':'Update ')+path+' from Clip Marker',
+      isSafe:remote=>{const d=parse(remote);return!!d&&d.game.id===gid&&!!base&&fp(d)===base},
+      conflict:remote=>{const d=parse(remote);return d&&d.game.id===gid
+        ?`This game was changed on GitHub since you opened it, maybe by someone else (GitHub's copy has ${d.clips.length} clips, yours has ${mine}). Replacing it loses those changes.\n\nReplace GitHub's copy with yours? To keep both, choose Cancel, click Download JSON to keep your version, then Open the newer game.`
+        :`There's already a different game saved as ${path}. Replace it with this one?`}});
+    if(r){if(S.game.id===gid){S.game.file=path;S.game.base=fp(JSON.parse(text));save()}toast('Saved to GitHub. The team page updates in about two minutes.',3500);renderList()}
   }catch(e){toast(e.message,6000,true)}
   b.disabled=false;
 };
@@ -578,7 +586,7 @@ function loadGame(d,file,ask){
     const g=d.game||{},m=d.match||{};
     const vid=g.videoId||m.videoId||'',vids=Array.isArray(g.videos)?g.videos.filter(v=>v&&typeof v.id==='string'&&v.id).map(v=>({id:v.id,label:typeof v.label==='string'?v.label:'',at:Number.isFinite(+v.at)?+v.at:0})):[];
     S.game={id:g.id||newId(),name:g.name||m.title||'',date:g.date||m.date||'',videos:vids.length?vids:vid?[{id:vid,label:'',at:0}]:[]};
-    if(file)S.game.file=file;
+    if(file){S.game.file=file;S.game.base=fp(d)}
     if(Array.isArray(d.roster)&&d.roster.length)S.roster=d.roster;
     S.clips=d.clips.map(c=>{const p=Array.isArray(c.players)?c.players:(c.player?[c.player]:[]);const{player,...r}=c;return{...r,players:p}});sel=null;save();render();
     $('#gname').value=S.game.name||'';$('#gdate').value=S.game.date||'';$('#roster').value=S.roster.join('\n');

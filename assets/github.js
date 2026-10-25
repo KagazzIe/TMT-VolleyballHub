@@ -136,24 +136,29 @@
 
   /* ---------- save ---------- */
   // opts: path, text, message, isSafe(remoteText) -> true when overwriting the current file is fine,
-  // conflict: question to ask when it isn't. Resolves {commitUrl, actionsUrl}, or null if the user cancelled.
+  // conflict: question to ask when it isn't (or a function of remoteText returning it).
+  // Resolves {commitUrl, actionsUrl}, or null if the user cancelled.
   async function save(opts){
     if(!site)throw new GHError('Saving to GitHub is only available on a team site.');
     if(!conn&&!(await connect()))return null;
     const what=opts.path.split('/').pop(),url='/repos/'+site.repo+'/contents/'+pathUrl(opts.path);
+    const actionsUrl='https://github.com/'+site.repo+'/actions';
     try{
       let sha;
       try{
         const cur=await api('GET',url,conn.token);
         sha=cur.sha;
         let remote=null;try{if(cur.encoding==='base64')remote=dec(cur.content)}catch(e){}
-        const same=remote!==null&&(remote===opts.text||remote===lastSaved.get(opts.path)||(opts.isSafe&&opts.isSafe(remote)));
-        if(!same&&!confirm(opts.conflict||`${what} was changed on GitHub since you opened this page, maybe by someone else. Replace it with your version?`))return null;
+        // Already on GitHub as is: committing would only add an empty commit
+        if(remote===opts.text){lastSaved.set(opts.path,opts.text);return{commitUrl:null,actionsUrl}}
+        const same=remote!==null&&(remote===lastSaved.get(opts.path)||(opts.isSafe&&opts.isSafe(remote)));
+        const ask=typeof opts.conflict==='function'?opts.conflict(remote):opts.conflict;
+        if(!same&&!confirm(ask||`${what} was changed on GitHub since you opened this page, maybe by someone else. Replace it with your version?`))return null;
       }catch(e){if(e.status!==404)throw e}
       const body={message:opts.message,content:enc(opts.text)};if(sha)body.sha=sha;
       const r=await api('PUT',url,conn.token,body);
       lastSaved.set(opts.path,opts.text);
-      return{commitUrl:r&&r.commit&&r.commit.html_url,actionsUrl:'https://github.com/'+site.repo+'/actions'};
+      return{commitUrl:r&&r.commit&&r.commit.html_url,actionsUrl};
     }catch(e){
       if(e.status===401)disconnect();
       throw new GHError(explain(e,what),e.status);

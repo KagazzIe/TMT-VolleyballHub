@@ -68,8 +68,12 @@ that first video, so hubs from before angles still play a version 4 game on it. 
   Keep Save buttons `hidden` until it resolves with a repo.
 - `TMTGitHub.save({path, text, message, isSafe, conflict})` asks to connect if needed, checks the current
   file, and commits. `isSafe(remoteText)` says when replacing what's on GitHub is fine (for example the
-  file this page loaded); otherwise it asks with `conflict`. Resolves `null` if the person cancels, and
+  file this page loaded); otherwise it asks with `conflict` (a string, or a function of the remote text).
+  It skips the commit when GitHub already has exactly `text`. Resolves `null` if the person cancels, and
   throws an Error with a plain-language message on failure.
+- Clip Marker keeps `S.game.base`, a fingerprint (`fp()`) of the team file the game was opened from or last
+  saved as, in its saved state. Its `isSafe` passes only when GitHub's copy still matches it, so two people
+  editing the same game can't silently overwrite each other. `base` is never written into the game file.
 - `TMTGitHub.status(el)` shows the "Saving to owner/repo as @name. Disconnect" line.
 - The token is sent only to `api.github.com`. Pages show team data, so always escape it before putting it in
   HTML (`esc()`), since a script injected through a game file could read the token.

@@ -488,6 +488,43 @@ await check('edit a team game in Clip Marker', '/team/clips/', async p => {
   await p.evaluate(() => localStorage.clear());
 });
 
+// Two people editing one game: saving over someone else's newer save asks first
+await check('marker asks before overwriting changes made since opening', '/team/clips/marker/?edit=2026-01-10-sample-game.json', async p => {
+  const name = 'clips/2026-01-10-sample-game.json';
+  const fixture = fs.readFileSync(path.join(FIXTURE, 'clips', '2026-01-10-sample-game.json'), 'utf8');
+  await p.evaluate(c => localStorage.setItem('tmt:github@/team/', c), CONN);
+  await p.reload(); await p.waitForTimeout(800);
+  expect(await p.evaluate(() => S.game.file === 'clips/2026-01-10-sample-game.json' && !!S.game.base), 'opening a team game should remember its version');
+  // Saving twice without changes makes one commit, without asking
+  GH.files = { [name]: { text: fixture, sha: 'old' } }; GH.puts = [];
+  let early = ''; p.on('dialog', d => { early = early || d.message(); d.dismiss(); });
+  await p.click('#ghSave'); await p.waitForTimeout(300);
+  await p.click('#ghSave'); await p.waitForTimeout(300);
+  p.removeAllListeners('dialog');
+  const unchangedPuts = GH.puts.length;
+  // Someone else adds a clip and saves first
+  const theirs = JSON.parse(fixture); theirs.clips.push({ ...theirs.clips[0], id: 'theirclip', note: 'their clip' });
+  const theirText = JSON.stringify(theirs, null, 2) + '\n';
+  GH.files = { [name]: { text: theirText, sha: 'theirs' } };
+  await p.evaluate(() => { S.clips[0].note = 'my edit'; });
+  let asked = ''; p.once('dialog', d => { asked = d.message(); d.dismiss(); });
+  await p.click('#ghSave'); await p.waitForTimeout(400);
+  expect(!early && unchangedPuts === 1, `saving an unchanged game again should not ask or commit, got ${unchangedPuts} commit(s), "${early}"`);
+  expect(asked.includes('changed on GitHub since you opened it') && asked.includes('7 clips') && GH.files[name].text === theirText,
+    `should ask before replacing a newer save and keep it on Cancel, got "${asked}"`);
+  // Choosing Replace saves, and later saves (even after a reload) don't ask again
+  p.once('dialog', d => d.accept());
+  await p.click('#ghSave'); await p.waitForTimeout(400);
+  expect(JSON.parse(GH.files[name].text).clips.some(c => c.note === 'my edit'), 'Replace should save my version');
+  await p.reload(); await p.waitForTimeout(800);
+  await p.evaluate(() => { S.clips[1].note = 'second edit'; });
+  asked = ''; p.once('dialog', d => { asked = d.message(); d.dismiss(); });
+  await p.click('#ghSave'); await p.waitForTimeout(400);
+  expect(!asked && JSON.parse(GH.files[name].text).clips.some(c => c.note === 'second edit'), `my own last save should not count as someone else's change, got "${asked}"`);
+  expect(!JSON.parse(GH.files[name].text).game.base, 'the version fingerprint should not be written into the game file');
+  await p.evaluate(() => localStorage.clear());
+});
+
 // Starter files must stay valid
 try { JSON.parse(fs.readFileSync(path.join(ROOT, 'starter', 'team.json'), 'utf8')); } catch (e) { fail('starter/team.json', e.message); }
 
