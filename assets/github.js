@@ -42,7 +42,7 @@
     const repo=site?site.repo:'your team repository';
     if(e.status===401)return 'Your GitHub token stopped working (it may have expired or been deleted). Connect again with a new one.';
     if(e.status===403&&e.limited)return 'GitHub says too many requests. Wait a few minutes and try again.';
-    if(e.status===403)return `This token can't change files in ${repo}. Make a new token with Contents set to "Read and write".`;
+    if(e.status===403)return `This token can't change files in ${repo}. Make a new token with Contents set to "Read and write". If the repository belongs to an organization, you also need Write access to it, and an owner may need to approve your token first.`;
     if(e.status===404)return `This token can't see ${repo}. Make a new token and pick ${repo} under "Repository access".`;
     if(e.status===409||e.status===422)return `${what} changed on GitHub while you were saving. Try again.`;
     return e.message;
@@ -84,7 +84,7 @@
 <li>Under <b>Repository access</b>, choose <b>Only select repositories</b> and pick <b>${repo}</b>.</li>
 <li>Click <b>Generate token</b>, then copy the token and paste it here.</li>
 </ol>
-<p class="ghhint">Only the repository's owner can make this token, unless the repository belongs to a GitHub organization you're a member of.</p>
+<p class="ghhint">Only the repository's owner can make this token, unless the repository belongs to a GitHub organization you're a member of. There, an organization owner may need to approve the token before it can save.</p>
 <label class="ghlab" for="ghtok">Token</label>
 <input id="ghtok" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_...">
 <label class="ghchk"><input id="ghrem" type="checkbox"> Remember on this device</label>

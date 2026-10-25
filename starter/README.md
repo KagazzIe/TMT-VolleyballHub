@@ -4,7 +4,8 @@ This repository holds our team's data for [TMT: Volleyball Hub](https://github.c
 our team name and roster, our rotation positions, and our tagged match clips. GitHub turns it into
 our team's website automatically.
 
-Your site's address is `https://YOUR-GITHUB-NAME.github.io/THIS-REPOSITORY-NAME/`.
+Your site's address is `https://OWNER.github.io/THIS-REPOSITORY-NAME/`, where OWNER is your GitHub
+name, or the organization's name if this repository belongs to a GitHub organization.
 You can also find it under **Settings → Pages**.
 
 Everything in this repository is public. Anyone with the link can see the site.
@@ -39,6 +40,11 @@ button, or delete it on GitHub under **Settings → Developer settings → Perso
 Only this repository's owner can make the token, unless the repository belongs to a GitHub
 organization. Anyone else can still use the upload way below.
 
+**Several people saving?** Put this repository in a free GitHub organization. Each helper joins the
+organization and gets **Write** access to this repository, then makes their own token the same way
+(the token page already picks the organization). An organization owner may need to approve each token
+under the organization's **Settings → Personal access tokens → Pending requests**.
+
 ### The upload way
 
 Download a file from your hub, then upload it here.
@@ -60,6 +66,8 @@ it's working, a green check means it's done. If the page still looks old, refres
   **Source** says **GitHub Actions**, not "Deploy from a branch". Then open **Actions → Deploy team hub →
   Run workflow** and click the green button.
 - **Save to GitHub says the token can't see or change this repository:** make a new token on GitHub's
-  token page, and make sure you pick this repository under **Repository access**.
+  token page, and make sure you pick this repository under **Repository access**. If this repository
+  belongs to an organization, you also need Write access to it, and an owner may need to approve
+  your token first.
 - **A grey icon on the very first run:** that's expected. The first run is skipped because
   GitHub Pages isn't switched on yet at that moment.
