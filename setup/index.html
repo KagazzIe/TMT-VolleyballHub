@@ -48,6 +48,9 @@ Set
 Hit
 Block</textarea>
     <div class="hint">The kinds of plays you tag in Clip Marker, one per line, in the order you want them listed. Add your own, like Dig or Free ball. Renaming a label later doesn't rename clips you already tagged.</div>
+    <label for="tags">Clip tags</label>
+    <textarea id="tags" style="min-height:110px" placeholder="Good&#10;Bad"></textarea>
+    <div class="hint">Extra labels for clips, one per line, like Good or Bad. A clip can have several. Clip Marker only offers the tags listed here, so everyone uses the same ones. Optional.</div>
     <div class="row"><button id="gh" class="pri" hidden>Save to GitHub</button><button id="dl" class="pri">Download team.json</button><button id="cp">Copy text</button></div>
     <p id="msg" role="status"></p>
     <p id="ghstat" hidden></p>
@@ -70,7 +73,8 @@ function build(){
   if(!name){$('msg').className='';$('msg').textContent='Add your team name first.';$('tname').focus();return null}
   const labels=lines('labels');
   if(!labels.length){$('msg').className='';$('msg').textContent='Add at least one play label.';$('labels').focus();return null}
-  return JSON.stringify({name,roster:lines('roster'),labels},null,2)+'\n';
+  const tags=lines('tags'),t={name,roster:lines('roster'),labels};if(tags.length)t.tags=tags;
+  return JSON.stringify(t,null,2)+'\n';
 }
 function done(t){$('msg').className='ok';$('msg').textContent=t}
 function oops(t){$('msg').className='';$('msg').textContent=t}
@@ -107,6 +111,7 @@ fetch('../team/team.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(
   if(typeof t.name==='string')$('tname').value=t.name;
   if(Array.isArray(t.roster))$('roster').value=t.roster.map(String).join('\n');
   if(Array.isArray(t.labels)&&t.labels.length)$('labels').value=t.labels.map(String).join('\n');
+  if(Array.isArray(t.tags))$('tags').value=t.tags.map(String).join('\n');
   $('loaded').hidden=false;
 });
 </script>

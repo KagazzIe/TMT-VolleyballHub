@@ -42,7 +42,7 @@ hidden (`controls: 0`) except in full screen; the pages provide play, seek, spee
 | `/rotations/` | `rotations/index.html` | 5-1 rotation guide and its editor (saves or exports `rotations.json`). View keys: `rx\|rot` (receive), `sv\|rot\|lib` (serving), `bs\|rot\|lib` (base), `dl\|rot\|lib` / `dr\|rot\|lib` (defense against their left / right side hit, starting from base). Version 3 added the `dl`/`dr` views and per-view `arrows`: `{from, pts}` starts at a player, `{pts, dash: true}` is the ball; drawn as smooth curves through the points. Version 2 files still load. The team defense is three more views, `def\|bs`, `def\|dl`, `def\|dr`, with `pos` (and arrow `from`) keyed by spot (`LF MF RF LB MID RB`) instead of player; every rotation's Defense uses it unless that rotation has its own `pos`. |
 | `/clips/` | `clips/index.html` | Match clip viewer. |
 | `/clips/marker/` | `clips/marker/index.html` | Clip Marker, saves or exports one game JSON (version 4: `game.videos` lists the angles, see below). |
-| `/setup/` | `setup/index.html` | Team Setup, a form that saves or downloads `team.json` (`name`, `roster`, `labels`). Team `labels` set Clip Marker's play list and the viewer's filter order; without them the defaults are Serve, Receive, Set, Hit, Block. |
+| `/setup/` | `setup/index.html` | Team Setup, a form that saves or downloads `team.json` (`name`, `roster`, `labels`, optional `tags`). Team `labels` set Clip Marker's play list and the viewer's filter order; without them the defaults are Serve, Receive, Set, Hit, Block. Team `tags` are the only clip tags Clip Marker offers (a clip's `tags` is a list; any number per clip); Match Clips shows them and filters by them. |
 
 Each page is one self-contained HTML file with inline CSS and JS, plus the shared stylesheet. Shared
 scripts: `assets/github.js` (Save to GitHub; Team Setup, the rotation editor and Clip Marker) and
@@ -100,6 +100,7 @@ The theme follows the device's light/dark setting. Dark mode is the navy look.
 | `--alert` | `#c0281f` | same | Rule highlights, errors |
 | `--ok` | `#2a9d5c` | same | Confirmation toasts |
 | `--arrow` / `--arrow-halo` | `#d4148c` / `#fffdf6` | `#ff4fb8` / `#0f1624` | Arrows on the court, drawn over a halo so they show on court lines |
+| `--pending` / `--pending-edge` | `#fff4cc` / `#d9a400` | `#3a3218` / `#e0b400` | Changes not saved yet (Clip Marker highlights edited and new clips) |
 | `--S --OH --MB --OPP --L` | `#e63946 #1d6fdc #2a9d5c #f4a300 #7b5cd6` | same | Player roles (setter, outside, middle, opposite, libero) |
 
 Type and shape:

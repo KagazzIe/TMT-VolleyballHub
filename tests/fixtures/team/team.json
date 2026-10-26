@@ -15,5 +15,9 @@
     "Set",
     "Hit",
     "Block"
+  ],
+  "tags": [
+    "Good",
+    "Bad"
   ]
 }

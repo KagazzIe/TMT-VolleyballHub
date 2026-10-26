@@ -66,6 +66,7 @@ main>*{min-width:0}
 .top{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .top .t{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
 .tag{background:var(--chip);border-radius:99px;padding:0 9px;font-size:13px}
+.ctags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 .note{margin-top:4px}
 .empty{background:var(--card);border:1px dashed var(--edge);border-radius:var(--r);padding:22px 16px;text-align:center;color:var(--muted)}
 .empty button{margin-top:10px}
@@ -142,13 +143,15 @@ const fmt=t=>{t=Math.max(0,t|0);const h=t/3600|0,m=(t%3600)/60|0,s=t%60;return(h
 const fmtDate=d=>{const m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(d||'');return m?new Date(+m[1],m[2]-1,+m[3]).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):(d||'')};
 // Play filter order: the team's labels from team.json, or the defaults
 let PREF=['Serve','Receive','Set','Hit','Block'];
+// Tag filter order: the team's tags from team.json
+let TAG_PREF=[];
 // Filter value for clips with no one tagged
 const NOBODY='Unassigned';
 const hasP=(c,p)=>p===NOBODY?!c.players.length:c.players.includes(p);
 const ALIAS={Spike:'Hit'};
 let GAMES={},GAME_ORDER=[],CLIPS=[],ROSTER=[];
 const Q=new URLSearchParams(location.search);
-const F={games:Q.getAll('game').length?new Set(Q.getAll('game')):null,players:new Set(Q.getAll('player')),actions:new Set(Q.getAll('action')),all:Q.get('all')==='1',q:Q.get('q')||'',order:Q.get('order')==='old'?'old':'new'};  // newest games first unless the link asks for oldest
+const F={games:Q.getAll('game').length?new Set(Q.getAll('game')):null,players:new Set(Q.getAll('player')),actions:new Set(Q.getAll('action')),tags:new Set(Q.getAll('tag')),all:Q.get('all')==='1',q:Q.get('q')||'',order:Q.get('order')==='old'?'old':'new'};  // newest games first unless the link asks for oldest
 if(F.actions.delete('Missed Receives')){F.actions.add('Receive');F.players.add(NOBODY)}
 let cur=null,ready=false,ended=false,armed=0,prevT=0,dragging=false;
 if(location.protocol==='file:')$('#warn').hidden=false;
@@ -173,7 +176,8 @@ function ingest(d,file){
   d.clips.forEach(c=>{
     const players=Array.isArray(c.players)?c.players:(c.player?[c.player]:[]);
     let action=ALIAS[c.action]||c.action||'';
-    CLIPS.push({key:gid+':'+c.id,gid,id:c.id,vid,start:+c.start,end:+c.end,players,action,note:c.note||''});
+    const tags=Array.isArray(c.tags)?[...new Set(c.tags.filter(t=>typeof t==='string'&&t.trim()).map(t=>t.trim()))]:[];
+    CLIPS.push({key:gid+':'+c.id,gid,id:c.id,vid,start:+c.start,end:+c.end,players,action,note:c.note||'',tags});
   });
   return true;
 }
@@ -222,6 +226,7 @@ async function loadIndex(){
   try{
     const t=await (await fetch('../team/team.json',{cache:'no-cache'})).json();
     if(Array.isArray(t.labels)){const l=t.labels.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim());if(l.length)PREF=l}
+    if(Array.isArray(t.tags))TAG_PREF=t.tags.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim());
   }catch(e){}
   try{
     const r=await fetch('../team/clips/index.json',{cache:'no-cache'});if(!r.ok)throw 0;
@@ -247,11 +252,12 @@ const test={
   games:c=>!F.games||F.games.has(c.gid),
   players:c=>!F.players.size||(F.all?[...F.players].every(p=>hasP(c,p)):[...F.players].some(p=>hasP(c,p))),
   actions:c=>!F.actions.size||F.actions.has(c.action),
-  q:c=>!F.q||(c.note+' '+c.action+' '+(c.players.length?c.players.join(' '):NOBODY)).toLowerCase().includes(F.q.toLowerCase())
+  tags:c=>!F.tags.size||c.tags.some(t=>F.tags.has(t)),
+  q:c=>!F.q||(c.note+' '+c.action+' '+c.tags.join(' ')+' '+(c.players.length?c.players.join(' '):NOBODY)).toLowerCase().includes(F.q.toLowerCase())
 };
 const filt=skip=>CLIPS.filter(c=>Object.keys(test).every(k=>k===skip||test[k](c)));
 const visible=()=>filt();
-const anyFilter=()=>F.games||F.players.size||F.actions.size||F.q;
+const anyFilter=()=>F.games||F.players.size||F.actions.size||F.tags.size||F.q;
 function chips(kind,allLabel,items,count,label){
   const sel=F[kind];
   return `<div class="chips"><button class="chip ${sel.size?'':'on'}" data-k="${kind}" data-v="">${allLabel}<b>${filt(kind).length}</b></button>`+
@@ -294,11 +300,13 @@ function renderFilters(){
   if(!CLIPS.length){$('#filters').innerHTML='';return}
   const acts=[...new Set(CLIPS.map(c=>c.action).filter(Boolean))].sort((a,b)=>{
     const i=PREF.indexOf(a),j=PREF.indexOf(b);return(i<0?99:i)-(j<0?99:j)||a.localeCompare(b)});
-  const pf=filt('players'),af=filt('actions');
+  const pf=filt('players'),af=filt('actions'),tf=filt('tags');
+  const tags=[...new Set(CLIPS.flatMap(c=>c.tags))].sort((a,b)=>{const i=TAG_PREF.indexOf(a),j=TAG_PREF.indexOf(b);return(i<0?999:i)-(j<0?999:j)||a.localeCompare(b)});
   $('#filters').innerHTML=
     '<h2>Player</h2>'+chips('players','Everyone',CLIPS.some(c=>!c.players.length)?[...ROSTER,NOBODY]:ROSTER,v=>pf.filter(c=>hasP(c,v)).length,esc)+
     (F.players.size>1?`<div class="seg">Clips with <button data-all="0" class="${F.all?'':'on'}">any of them</button><button data-all="1" class="${F.all?'on':''}">all of them</button></div>`:'')+
-    '<h2>Play</h2>'+chips('actions','All plays',acts,v=>af.filter(c=>c.action===v).length,esc);
+    '<h2>Play</h2>'+chips('actions','All plays',acts,v=>af.filter(c=>c.action===v).length,esc)+
+    (tags.length?'<h2>Tag</h2>'+chips('tags','Any tag',tags,v=>tf.filter(c=>c.tags.includes(v)).length,esc):'');
 }
 function refresh(){renderFilters();renderList();setUrl()}
 $('#filters').addEventListener('click',e=>{
@@ -309,7 +317,7 @@ $('#filters').addEventListener('click',e=>{
 });
 $('#q').value=F.q;
 $('#q').oninput=e=>{F.q=e.target.value.trim();refresh()};
-function clearAll(){F.games=null;F.players.clear();F.actions.clear();F.all=false;F.q='';$('#q').value='';refresh()}
+function clearAll(){F.games=null;F.players.clear();F.actions.clear();F.tags.clear();F.all=false;F.q='';$('#q').value='';refresh()}
 
 /* ---------- rendering ---------- */
 function renderHead(){
@@ -337,6 +345,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeCopyMenu()});
 const editLink=g=>g&&g.file?`<a class="edit" href="marker/?edit=${encodeURIComponent(g.file)}" title="Open this game in Clip Marker">Edit game</a>`:'';
 const card=c=>`<article class="clip ${cur&&cur.key===c.key?'sel':''}" data-key="${esc(c.key)}" tabindex="0">
   <div class="top"><span><b>${esc(c.action||'Play')}</b>${who(c)}</span><span class="acts">${copyBtn(c)}<span class="t">${fmt(c.start)}</span></span></div>
+  ${c.tags.length?`<div class="ctags">${c.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:''}
   ${c.note?`<div class="note">${esc(c.note)}</div>`:''}</article>`;
 function renderList(){
   const v=visible();
@@ -380,7 +389,7 @@ new ResizeObserver(()=>document.documentElement.style.setProperty('--stageh',$('
 /* ---------- shareable links ---------- */
 function viewQuery(withClip){
   const q=new URLSearchParams();
-  if(F.games)F.games.forEach(v=>q.append('game',v));F.players.forEach(v=>q.append('player',v));F.actions.forEach(v=>q.append('action',v));
+  if(F.games)F.games.forEach(v=>q.append('game',v));F.players.forEach(v=>q.append('player',v));F.actions.forEach(v=>q.append('action',v));F.tags.forEach(v=>q.append('tag',v));
   if(F.all&&F.players.size>1)q.set('all','1');if(F.q)q.set('q',F.q);if(F.order==='old')q.set('order','old');
   if(withClip&&cur)q.set('clip',cur.key);
   return q.toString();

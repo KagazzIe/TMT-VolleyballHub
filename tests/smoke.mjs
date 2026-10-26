@@ -368,6 +368,7 @@ await check('setup team', '/team/setup/', async p => {
   expect((await p.inputValue('#tname')) === 'Sample Squad', 'should start from the team file');
   expect((await p.inputValue('#roster')).split('\n').length === 6, 'roster should come from the team file');
   expect((await p.inputValue('#labels')).split('\n').join() === 'Serve,Receive,Dig,Set,Hit,Block', 'labels should come from the team file');
+  expect((await p.inputValue('#tags')).split('\n').join() === 'Good,Bad', 'clip tags should come from the team file');
 });
 await check('setup demo', '/demo/setup/', async p => {
   expect((await p.inputValue('#tname')) === '', 'demo should start empty');
@@ -378,7 +379,12 @@ await check('setup demo', '/demo/setup/', async p => {
   const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#dl')]);
   expect(dl.suggestedFilename() === 'team.json', 'file should be named team.json');
   const out = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
-  expect(out.name === 'New Team' && out.roster.join() === 'Ana,Bo,Cy' && out.labels.join() === 'Serve,Receive,Set,Hit,Block', `unexpected team.json: ${JSON.stringify(out)}`);
+  expect(out.name === 'New Team' && out.roster.join() === 'Ana,Bo,Cy' && out.labels.join() === 'Serve,Receive,Set,Hit,Block' && !('tags' in out), `unexpected team.json: ${JSON.stringify(out)}`);
+  // Clip tags are optional; when given, they're saved one per line
+  await p.fill('#tags', 'Good\n Bad \nGood');
+  const [dl2] = await Promise.all([p.waitForEvent('download'), p.click('#dl')]);
+  const out2 = JSON.parse(fs.readFileSync(await dl2.path(), 'utf8'));
+  expect(out2.tags && out2.tags.join() === 'Good,Bad', `tags should be saved without blanks or repeats, got ${JSON.stringify(out2)}`);
 });
 
 // Save to GitHub
@@ -485,6 +491,56 @@ await check('edit a team game in Clip Marker', '/team/clips/', async p => {
   let asked = ''; p.once('dialog', d => { asked = d.message(); d.dismiss(); });
   await p.click('#openlist button'); await p.waitForTimeout(400);
   expect(asked.includes('replaces the game') && (await p.evaluate(() => S.clips[0].note)) === 'unsaved change', `should ask before replacing unsaved work, got "${asked}"`);
+  await p.evaluate(() => localStorage.clear());
+});
+
+// Clip tags: picked in Clip Marker from the team's list, shown and filtered in Match Clips
+await check('clip tags', '/team/clips/', async p => {
+  const tagChips = await p.$$eval('#filters .chip[data-k="tags"]', b => b.map(x => x.dataset.v + ':' + x.querySelector('b').textContent));
+  expect(tagChips.join() === ':6,Good:1', `Tag filter should list tags in use, got ${tagChips}`);
+  await p.click('#filters .chip[data-k="tags"][data-v="Good"]');
+  const r = await p.evaluate(() => ({ n: visible().length, url: location.search, card: document.querySelector('#list .clip .ctags')?.textContent }));
+  expect(r.n === 1 && r.url.includes('tag=Good') && r.card === 'Good', `filtering by tag should show the tagged clip, got ${JSON.stringify(r)}`);
+  await p.goto(BASE + '/team/clips/marker/?edit=2026-01-10-sample-game.json'); await p.waitForTimeout(900);
+  const opts = await p.$$eval('#list .clip:nth-child(2) [data-f="addtag"] option', o => o.map(x => x.textContent));
+  expect(opts.join() === 'Add tag,Good,Bad', `Clip Marker should offer only the team's tags, got ${opts}`);
+  expect((await p.textContent('#list .clip:nth-child(1) .ctag')).startsWith('Good'), 'existing tags should show on the clip');
+  await p.selectOption('#list .clip:nth-child(2) [data-f="addtag"]', 'Bad');
+  await p.selectOption('#list .clip:nth-child(2) [data-f="addtag"]', 'Good');
+  const m = await p.evaluate(() => ({ tags: S.clips[1].tags, pend: document.querySelector('#list .clip:nth-child(2) .pendtag').textContent, out: out().clips.slice(0, 3).map(c => c.tags || null) }));
+  expect(m.tags.join() === 'Bad,Good' && m.pend.startsWith('Changed: tags') && JSON.stringify(m.out) === '[["Good"],["Bad","Good"],null]',
+    `adding tags should change the clip and the file, got ${JSON.stringify(m)}`);
+  expect(!(await p.isVisible('#list .clip:nth-child(2) [data-f="addtag"]')), 'once every team tag is on a clip there is nothing left to add');
+  await p.click('#list .clip:nth-child(2) [data-a="untag"][data-t="Bad"]');
+  expect((await p.evaluate(() => S.clips[1].tags.join())) === 'Good', 'removing a tag should work');
+  await p.evaluate(() => localStorage.clear());
+});
+
+// Unsaved changes to a team game are highlighted until it's saved
+await check('marker highlights unsaved changes', '/team/clips/marker/?edit=2026-01-10-sample-game.json', async p => {
+  await p.evaluate(c => localStorage.setItem('tmt:github@/team/', c), CONN);
+  await p.reload(); await p.waitForTimeout(800);
+  const state = () => p.evaluate(() => ({ pend: [...document.querySelectorAll('#list .clip.pend')].map(el => el.querySelector('.pendtag').textContent),
+    banner: document.getElementById('editing').textContent, bannerPend: document.getElementById('editing').classList.contains('pend') }));
+  let s = await state();
+  expect(!s.pend.length && !s.bannerPend && s.banner.includes('No unsaved changes'), `a freshly opened game has nothing pending, got ${JSON.stringify(s)}`);
+  // Type a note on the first clip, add a clip (it sorts last), delete the second one
+  await p.fill('#list .clip:nth-child(1) [data-f="note"]', 'better pass');
+  await p.evaluate(() => { stage.seek(300); }); await p.click('#mark');
+  await p.click('#list .clip:nth-child(2) [data-a="del"]');
+  s = await state();
+  expect(s.pend.length === 2 && s.pend.includes('Changed: noteUndo') && s.pend.includes('New') && s.bannerPend && s.banner.includes('1 edited, 1 new, 1 deleted'),
+    `edited and new clips should be highlighted, with a summary, got ${JSON.stringify(s)}`);
+  // Undo puts the clip back
+  await p.click('#list .clip.pend [data-a="undo"]');
+  s = await state();
+  expect(s.pend.join() === 'New' && (await p.evaluate(() => S.clips[0].note)) === '', `Undo should restore the clip, got ${JSON.stringify(s)}`);
+  // Saving clears the highlighting
+  const fixture = fs.readFileSync(path.join(FIXTURE, 'clips', '2026-01-10-sample-game.json'), 'utf8');
+  GH.files = { 'clips/2026-01-10-sample-game.json': { text: fixture, sha: 'old' } }; GH.puts = [];
+  await p.click('#ghSave'); await p.waitForTimeout(400);
+  s = await state();
+  expect(GH.puts.length === 1 && !s.pend.length && !s.bannerPend, `saving should clear pending changes, got ${JSON.stringify(s)}`);
   await p.evaluate(() => localStorage.clear());
 });
 

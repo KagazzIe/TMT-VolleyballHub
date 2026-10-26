@@ -22,7 +22,10 @@
         "Alex"
       ],
       "action": "Serve",
-      "note": ""
+      "note": "",
+      "tags": [
+        "Good"
+      ]
     },
     {
       "id": "c2",
