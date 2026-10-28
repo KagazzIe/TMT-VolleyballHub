@@ -363,6 +363,41 @@ await check('marker demo', '/demo/clips/marker/', async p => {
   await p.click('#hkopen');
   expect(await p.isVisible('#hkunlock'), 'demo can still edit its own label list');
 });
+await check('marker auto-fills new marks', '/team/clips/marker/', async p => {
+  await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(600);
+  await p.click('#vsetup'); await p.fill('#url', 'https://www.youtube.com/watch?v=M7lc1UVf-VE'); await p.click('#load'); await p.click('#vdone'); await p.waitForTimeout(150);
+  // Built-in chain: Receive, then Set, then Hit, while marks stay in the same rally
+  await p.evaluate(() => stage.seek(100)); await p.keyboard.press('m'); await p.keyboard.press('j');
+  await p.keyboard.press('m'); await p.keyboard.press('m');
+  await p.evaluate(() => stage.seek(300)); await p.keyboard.press('m');
+  let acts = await p.evaluate(() => S.clips.map(c => c.action));
+  expect(acts.join() === 'Receive,Set,Hit,', `marks should follow Receive > Set > Hit, and a new rally starts blank, got ${acts}`);
+  // A default player per play, skipped when that player made the mark just before
+  await p.click('#afopen');
+  await p.selectOption('#afbody [data-player="Set"]', 'Blair'); await p.click('#afx');
+  await p.evaluate(() => stage.seek(500)); await p.keyboard.press('m'); await p.keyboard.press('j'); await p.keyboard.press('m');
+  await p.evaluate(() => stage.seek(700)); await p.keyboard.press('m'); await p.keyboard.press('j'); await p.keyboard.press('2'); await p.keyboard.press('m');
+  const c = await p.evaluate(() => S.clips.slice(4).map(c => c.action + ':' + c.players.join('+')));
+  expect(c.join() === 'Receive:,Set:Blair,Receive:Blair,Set:', `the setter should be filled in unless they took the receive, got ${c}`);
+  // Changing the play swaps an auto-filled player, but never one picked by hand
+  await p.keyboard.press('ArrowUp'); await p.keyboard.press('ArrowUp'); await p.keyboard.press('ArrowUp'); await p.keyboard.press('k');
+  expect((await p.evaluate(() => curClip().players.join())) === 'Blair', 'picking Set should fill in the setter');
+  await p.keyboard.press('l');
+  expect((await p.evaluate(() => curClip().players.join())) === '', 'changing to a play with no default should clear the auto-filled setter');
+  expect(!JSON.stringify(await p.evaluate(() => out())).includes('autoP'), 'auto-fill bookkeeping should stay out of the game file');
+  // Suggestions from the team's games
+  const L = await p.evaluate(() => {
+    const cl = [];
+    for (let i = 0; i < 8; i++) cl.push({ start: i * 60, action: 'Receive', players: ['Casey'] }, { start: i * 60, action: 'Set', players: [i < 6 ? 'Blair' : 'Drew'] }, { start: i * 60 + 2, action: 'Hit', players: ['Emery'] }, { start: i * 60 + 30, action: 'Serve', players: [i < 4 ? 'Alex' : 'Finley'] });
+    return learn([{ clips: cl }], 10);
+  });
+  expect(L.next.Receive === 'Set' && L.next.Set === 'Hit' && L.player.Set === 'Blair' && L.player.Serve === '=last' && !L.next.Serve,
+    `suggestions should find the chain, the setter and the repeating server, got ${JSON.stringify(L)}`);
+  await p.click('#afopen');
+  expect(await p.isVisible('#afsuggest'), 'Suggest should be offered on a team site with games');
+  await p.click('#afx');
+  await p.evaluate(() => localStorage.clear());
+});
 
 await check('setup team', '/team/setup/', async p => {
   expect((await p.inputValue('#tname')) === 'Sample Squad', 'should start from the team file');

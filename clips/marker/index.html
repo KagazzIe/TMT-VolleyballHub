@@ -83,6 +83,13 @@ textarea{width:100%;min-height:150px;margin-top:6px}
 .cfg{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;align-items:center}
 .cfg input[type=number]{width:64px}
 #hkmsg{color:var(--alert)}
+#afbody{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px 8px;align-items:center;margin-top:10px}
+#afbody .h{font:600 13px var(--font);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+#afbody select{width:100%;min-width:0}
+#afbody .why{grid-column:2/4;margin-top:-4px;font-size:12.5px;color:var(--muted)}
+#afbody .why:empty{display:none}
+#afgap{width:64px}
+#af .cfg label{display:inline-flex;align-items:center;gap:6px}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ok);color:#fff;padding:6px 16px;border-radius:99px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none}
 #toast.on{opacity:1}
 #toast.err{background:var(--alert)}
@@ -103,6 +110,7 @@ textarea{width:100%;min-height:150px;margin-top:6px}
   <input id="gdate" type="date" aria-label="Game date">
   <button id="newgame">New game</button>
   <button id="hkopen">Hotkeys</button>
+  <button id="afopen" title="Fill in the play and player of new marks from patterns">Auto-fill</button>
   <label class="sizectl">Video size <input type="range" id="size" min="40" max="80" step="1" aria-label="Video size"></label>
   <button id="vsetup" aria-expanded="false" aria-controls="vpanel">Video setup ▾</button>
 </div>
@@ -174,6 +182,17 @@ textarea{width:100%;min-height:150px;margin-top:6px}
   <div id="hkbody"></div>
   <div class="row" style="margin-top:12px"><button id="hkadd" hidden>Add action</button><button id="hkunlock">Edit action list</button><button id="hkreset">Reset to defaults</button></div>
 </dialog>
+<dialog id="af" aria-label="Auto-fill">
+  <div class="row" style="justify-content:space-between"><strong>Auto-fill new marks</strong><button id="afx" class="pri">Done</button></div>
+  <p class="mut" style="margin:6px 0 0">Fills in the play and player of each new mark, so often you only press M. Anything filled in is just a starting point: an action or player key still changes it.</p>
+  <div class="cfg">
+    <label><input type="checkbox" id="afon"> Auto-fill new marks</label>
+    <label>Same rally when marks are within <input type="number" id="afgap" min="0" max="60" step="1"> s</label>
+  </div>
+  <div id="afbody"></div>
+  <div class="row" style="margin-top:12px"><button id="afsuggest" hidden title="Look at the games on your team site and fill this in from them">Suggest from our games</button><button id="afclear">Clear all</button></div>
+  <p id="afmsg" class="mut" style="margin:8px 0 0"></p>
+</dialog>
 <div id="toast"></div>
 <script>
 const DEFAULT_ROSTER=['Player 1','Player 2','Player 3','Player 4','Player 5','Player 6','Player 7'];
@@ -198,6 +217,10 @@ if(SAVED&&SAVED.cfgv!==3){S.actions=DEFAULT_ACTIONS.map(a=>[...a]);S.pkeys=[];S.
 S.cfgv=3;
 if(S.roster.every((n,i)=>n==='Player '+(i+1)))S.roster=[...DEFAULT_ROSTER];
 let ACTIONS=S.actions;
+// Auto-fill (per browser, like hotkeys). next: play -> the next mark's play when it's in the same rally.
+// player: play -> '' (nobody), '=last' (whoever made the last mark of that play) or a roster name.
+if(!S.auto||typeof S.auto!=='object')S.auto={on:true,gap:10,next:{Receive:'Set',Set:'Hit'},player:{}};
+S.auto=Object.assign({on:true,gap:10,next:{},player:{}},S.auto);
 if(!(S.size>=40&&S.size<=80))S.size=62;
 S.clips.forEach(c=>{if(!Array.isArray(c.players))c.players=c.player?[c.player]:[];delete c.player});
 const cleanTags=t=>Array.isArray(t)?[...new Set(t.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim().slice(0,40)))].slice(0,20):[];
@@ -335,7 +358,31 @@ function mark(){
   if(!stage.ready())return toast('Load a video first');
   const t=cur(),[a,b]=span();
   const c={id:Date.now().toString(36),start:r1(Math.max(a,t-S.pre)),end:r1(Math.min(b>a?b:1e9,t+S.post)),players:[],action:'',note:'',tags:[]};
-  S.clips.push(c);sortClips();sel=c.id;save();render();toast('Marked at '+fmt(t));
+  S.clips.push(c);sortClips();autoFill(c);sel=c.id;save();render();
+  toast(['Marked at '+fmt(t),c.action,c.players.join(', ')].filter(Boolean).join(' · '),c.action?1800:1200);
+}
+// Auto-fill: the mark just before this one, when it's close enough to be the same rally
+function prevInRally(c){
+  const i=S.clips.indexOf(c),p=i>0?S.clips[i-1]:null;
+  return p&&c.start-p.start<=S.auto.gap?p:null;
+}
+const isAction=l=>ACTIONS.some(a=>a[1]===l);
+function autoFill(c){
+  if(!S.auto.on)return;
+  const p=prevInRally(c),n=p&&p.action&&S.auto.next[p.action];
+  if(n&&isAction(n))c.action=n;
+  autoPlayer(c);
+}
+// The default player for the clip's play. Only fills a clip with no players, or with the ones auto-fill
+// put there (so changing the play swaps them). Skipped when that player made the mark just before.
+function autoPlayer(c){
+  if(!S.auto.on)return;
+  if(c.players.length&&c.players.join('\n')!==(c.autoP||''))return;
+  const v=c.action&&S.auto.player[c.action];let n='';
+  if(v==='=last'){const l=S.clips.filter(x=>x!==c&&x.action===c.action&&x.players.length&&x.start<=c.start).pop();n=l?l.players[0]:''}
+  else if(v&&S.roster.includes(v))n=v;
+  const p=prevInRally(c);if(n&&p&&p.players.includes(n))n='';
+  c.players=n?[n]:[];c.autoP=n||'';
 }
 $('#mark').onclick=mark;
 function preview(c){
@@ -387,7 +434,7 @@ $('#list').addEventListener('change',e=>{
   }else if(f==='addtag'){
     if(TEAM_TAGS.includes(e.target.value)&&!c.tags.includes(e.target.value))c.tags.push(e.target.value);
     save();renderList();
-  }else{c[f]=e.target.value;save();renderChips()}
+  }else{c[f]=e.target.value;if(f==='action'){autoPlayer(c);renderList()}save();renderChips()}
 });
 
 /* Rendering */
@@ -484,7 +531,7 @@ function togglePlayer(n){
   c.players=c.players.includes(n)?c.players.filter(p=>p!==n):[...c.players,n];
   save();renderList();renderChips();
 }
-function setAction(l){const c=curClip();if(!c)return toast('Mark a clip first');c.action=l;save();renderList()}
+function setAction(l){const c=curClip();if(!c)return toast('Mark a clip first');c.action=l;autoPlayer(c);save();renderList();renderChips()}
 const PRETTY={space:'Space',arrowleft:'←',arrowright:'→',arrowup:'↑',arrowdown:'↓',enter:'Enter',escape:'Esc',backspace:'Backspace',tab:'Tab'};
 const pretty=k=>k.split('+').map(p=>PRETTY[p]||(p.length===1?p.toUpperCase():p[0].toUpperCase()+p.slice(1))).join(' + ');
 function combo(e){const k=e.key===' '?'space':e.key.toLowerCase();return(e.shiftKey&&k.length>1?'shift+':'')+k}
@@ -546,6 +593,67 @@ $('#hkreset').onclick=()=>{
   capturing=null;save();render();renderHk();
 };
 
+/* Auto-fill settings */
+let AF_WHY={};
+function renderAf(){
+  const A=S.auto,acts=ACTIONS.map(a=>a[1]);
+  $('#afon').checked=A.on;$('#afgap').value=A.gap;
+  const opt=(v,l,cur)=>`<option value="${esc(v)}" ${v===cur?'selected':''}>${esc(l)}</option>`;
+  $('#afbody').innerHTML='<span class="h">After</span><span class="h">Next mark is</span><span class="h">Player</span>'+acts.map(a=>`
+    <strong>${esc(a)}</strong>
+    <select data-next="${esc(a)}" aria-label="Next mark after ${esc(a)}">${opt('','No guess',A.next[a]||'')}${acts.map(x=>opt(x,x,A.next[a]||'')).join('')}</select>
+    <select data-player="${esc(a)}" aria-label="Player for ${esc(a)}">${opt('','Nobody',A.player[a]||'')}${opt('=last','Same as last '+a,A.player[a]||'')}${S.roster.map(n=>opt(n,n,A.player[a]||'')).join('')}</select>
+    <span></span><span class="why">${esc(AF_WHY[a]||'')}</span>`).join('');
+  $('#afsuggest').hidden=!TEAM_FILES.length;
+}
+$('#afopen').onclick=()=>{$('#afmsg').textContent='';renderAf();$('#af').showModal()};
+$('#afx').onclick=()=>$('#af').close();
+$('#afon').onchange=e=>{S.auto.on=e.target.checked;save()};
+$('#afgap').onchange=e=>{S.auto.gap=Math.max(0,Math.min(60,+e.target.value||0));e.target.value=S.auto.gap;save()};
+$('#afbody').addEventListener('change',e=>{
+  const d=e.target.dataset,v=e.target.value;
+  if(d.next!==undefined){if(v)S.auto.next[d.next]=v;else delete S.auto.next[d.next]}
+  if(d.player!==undefined){if(v)S.auto.player[d.player]=v;else delete S.auto.player[d.player]}
+  save();
+});
+$('#afclear').onclick=()=>{S.auto.next={};S.auto.player={};AF_WHY={};save();renderAf()};
+// Suggest: what usually comes next in a rally, and who usually makes each play, in the team's games.
+// A guess is used when it's right at least 60% of the time over at least 5 marks.
+const pct=(n,d)=>Math.round(n/d*100)+'%';
+function learn(games,gap){
+  const next={},player={},why={};
+  const succ={},from={},who={},withP={},rep={},repN={};
+  games.forEach(d=>{
+    const cl=d.clips.filter(c=>c&&Number.isFinite(+c.start)).sort((a,b)=>a.start-b.start),last={};
+    cl.forEach((c,i)=>{
+      const a=c.action,ps=Array.isArray(c.players)?c.players:[],p=cl[i-1];if(!a)return;
+      if(p&&p.action&&c.start-p.start<=gap){(succ[p.action]??={})[a]=(succ[p.action][a]||0)+1;from[p.action]=(from[p.action]||0)+1}
+      if(ps.length){
+        withP[a]=(withP[a]||0)+1;ps.forEach(n=>{(who[a]??={})[n]=(who[a][n]||0)+1});
+        if(last[a]){repN[a]=(repN[a]||0)+1;if(last[a]===ps[0])rep[a]=(rep[a]||0)+1}
+        last[a]=ps[0];
+      }
+    });
+  });
+  const top=o=>Object.entries(o||{}).sort((a,b)=>b[1]-a[1])[0];
+  ACTIONS.forEach(([,a])=>{
+    const w=[],s=top(succ[a]);
+    if(s&&from[a]>=5&&s[1]/from[a]>=.6&&isAction(s[0])){next[a]=s[0];w.push(s[0]+' came next '+pct(s[1],from[a])+' of the time')}
+    const t=top(who[a]),r=rep[a]||0,rn=repN[a]||0;
+    if(t&&withP[a]>=5&&t[1]/withP[a]>=.6&&S.roster.includes(t[0])){player[a]=t[0];w.push(t[0]+' made '+pct(t[1],withP[a])+' of them')}
+    else if(rn>=5&&r/rn>=.5){player[a]='=last';w.push('the same player as the last '+a+' '+pct(r,rn)+' of the time')}
+    if(w.length)why[a]=w.join('; ');
+  });
+  return{next,player,why};
+}
+$('#afsuggest').onclick=async()=>{
+  const b=$('#afsuggest');b.disabled=true;$('#afmsg').textContent='Looking at your games…';
+  const games=(await Promise.all(TEAM_FILES.map(f=>teamGame(f).catch(()=>null)))).filter(Boolean);
+  const L=learn(games,S.auto.gap),n=games.reduce((s,d)=>s+d.clips.length,0);
+  S.auto.next=L.next;S.auto.player=L.player;AF_WHY=L.why;save();renderAf();b.disabled=false;
+  $('#afmsg').textContent=`Filled in from ${games.length} games (${n} marks). Change anything that's off.`;
+};
+
 document.addEventListener('click',e=>{if(e.target.matches('button'))e.target.blur()});
 document.addEventListener('keydown',e=>{
   if(capturing){
@@ -558,7 +666,7 @@ document.addEventListener('keydown',e=>{
     setBinding(capturing,k);capturing=null;hkMsg('');save();render();renderHk();
     return;
   }
-  if($('#hk').open||e.metaKey||e.ctrlKey||e.altKey)return;
+  if($('#hk').open||$('#af').open||e.metaKey||e.ctrlKey||e.altKey)return;
   const t=e.target;
   if(t.tagName==='TEXTAREA'||t.tagName==='SELECT'||(t.tagName==='INPUT'&&!/range|checkbox|file/.test(t.type)))return;
   const k=combo(e),hit=allBinds().find(b=>b.key&&b.key===k);
