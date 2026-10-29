@@ -149,5 +149,10 @@ Copy a team repo's data files into a `team/` folder here (it's gitignored), crea
 `python -m http.server` and open http://localhost:8000/. Or copy `tests/fixtures/team` to `team/`
 for sample data.
 
+To try changes against a real team's current data without copying anything, run
+`python tests/serve.py https://owner.github.io/team-repo/` and open http://localhost:8000/. Pages come
+from this folder and `team/` is read from that team's published site. It's read-only: Save to GitHub
+stays hidden, so edits only live in your browser.
+
 ## License
 [MIT](LICENSE).
