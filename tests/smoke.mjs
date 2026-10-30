@@ -374,6 +374,8 @@ await check('marker auto-fills new marks', '/team/clips/marker/', async p => {
   expect(acts.join() === 'Receive,Set,Hit,', `marks should follow Receive > Set > Hit, and a new rally starts blank, got ${acts}`);
   // A default player per play, skipped when that player made the mark just before
   await p.click('#afopen');
+  const off = await p.$$eval('#afbody strong', s => s.map(x => Math.round(x.nextElementSibling.getBoundingClientRect().top - x.getBoundingClientRect().top)));
+  expect(off.length === 6 && new Set(off).size === 1, `each play's name and menus should share a row, got offsets ${off}`);
   await p.selectOption('#afbody [data-player="Set"]', 'Blair'); await p.click('#afx');
   await p.evaluate(() => stage.seek(500)); await p.keyboard.press('m'); await p.keyboard.press('j'); await p.keyboard.press('m');
   await p.evaluate(() => stage.seek(700)); await p.keyboard.press('m'); await p.keyboard.press('j'); await p.keyboard.press('2'); await p.keyboard.press('m');

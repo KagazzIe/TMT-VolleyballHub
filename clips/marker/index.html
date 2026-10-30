@@ -87,7 +87,6 @@ textarea{width:100%;min-height:150px;margin-top:6px}
 #afbody .h{font:600 13px var(--font);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 #afbody select{width:100%;min-width:0}
 #afbody .why{grid-column:2/4;margin-top:-4px;font-size:12.5px;color:var(--muted)}
-#afbody .why:empty{display:none}
 #afgap{width:64px}
 #af .cfg label{display:inline-flex;align-items:center;gap:6px}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ok);color:#fff;padding:6px 16px;border-radius:99px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none}
@@ -603,7 +602,7 @@ function renderAf(){
     <strong>${esc(a)}</strong>
     <select data-next="${esc(a)}" aria-label="Next mark after ${esc(a)}">${opt('','No guess',A.next[a]||'')}${acts.map(x=>opt(x,x,A.next[a]||'')).join('')}</select>
     <select data-player="${esc(a)}" aria-label="Player for ${esc(a)}">${opt('','Nobody',A.player[a]||'')}${opt('=last','Same as last '+a,A.player[a]||'')}${S.roster.map(n=>opt(n,n,A.player[a]||'')).join('')}</select>
-    <span></span><span class="why">${esc(AF_WHY[a]||'')}</span>`).join('');
+    ${AF_WHY[a]?`<span class="why">${esc(AF_WHY[a])}</span>`:''}`).join('');
   $('#afsuggest').hidden=!TEAM_FILES.length;
 }
 $('#afopen').onclick=()=>{$('#afmsg').textContent='';renderAf();$('#af').showModal()};
