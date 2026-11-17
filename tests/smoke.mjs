@@ -292,7 +292,7 @@ await check('rotations libero choice, hitting views and arrows', '/team/rotation
   const top = () => p.evaluate(() => Math.round(document.getElementById('court').getBoundingClientRect().top + scrollY));
   const libShown = () => p.evaluate(() => getComputedStyle(document.getElementById('libWrap')).visibility === 'visible');
   const t0 = await top();
-  expect(!(await libShown()), 'libero choice should be hidden while receiving');
+  expect(await libShown(), 'libero choice should show while receiving');
   await p.click('#view [data-v="serving"]');
   expect(await libShown(), 'libero choice should show while serving');
   await p.click('#sys [data-s="0"]');

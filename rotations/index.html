@@ -205,9 +205,9 @@ function defaultLibero(){
   const mb=['MB1','MB2'].find(r=>!front(slot(r,rot)));
   return view==='serving'&&slot(mb,rot)===1?null:mb;
 }
-// The libero choice (left, middle, none) is for serving and base. Receive layouts always have the libero
-// in (unless the team takes them out for that rotation), so the choice is hidden there.
-const libOn=()=>view==='receive'||lib!=='off';
+// The libero choice (left, middle, none) applies to every view. Receive layouts are shared by all
+// libero settings (key rx|rot); choosing None there shows the receive layout without a libero.
+const libOn=()=>lib!=='off';
 function liberoFor(){
   if(pos!==1||!libOn())return null;
   const l=rec().libero;
@@ -511,7 +511,7 @@ function updatePanel(){
   $('editPanel').hidden=!show;document.body.classList.toggle('editing',show);
   if(!show)return;
   const k=stateKey(),r=rec(),t=TEAM[k]||{},changed=panelKey!==k;panelKey=k;
-  $('ctx').textContent=`Rotation ${rot+1} · ${viewName()}`+(view==='receive'?'.':` · ${lib==='off'?'no libero':'libero '+(lib==='left'?'left':'middle')}.`);
+  $('ctx').textContent=`Rotation ${rot+1} · ${viewName()}`+` · ${lib==='off'?'no libero':'libero '+(lib==='left'?'left':'middle')}`+(view==='receive'?'. Receive layouts are shared by all libero settings.':'.');
   const src=!r.pos?'default (plain rotation order)':(t.pos&&JSON.stringify(clone(r.pos))===JSON.stringify(clone(t.pos)))?'from the team file':'edited in this browser';
   if(isDef()){
     const td=teamDef().pos;
@@ -577,8 +577,8 @@ function updateUI(P){
   ['view','editRow'].forEach(i=>$(i).hidden=!p);
   svg.classList.toggle('drawing',!!drawing);
   $('hit').hidden=!(p&&view==='base');on('#hit button',b=>b.dataset.h===hit);
-  // Hide the libero choice without removing its space, so the court doesn't jump
-  const lw=$('libWrap'),lo=p&&view!=='receive';lw.classList.toggle('gone',!lo);lw.inert=!lo;
+  // Hide the libero choice (non-positional) without removing its space, so the court doesn't jump
+  const lw=$('libWrap'),lo=p;lw.classList.toggle('gone',!lo);lw.inert=!lo;
   $('serveNote').hidden=p&&view==='base';$('baseNote').hidden=!(p&&view==='base');
   svg.classList.toggle('editing',edit&&!!k);
   $('status').textContent=pending?'Showing the positions you saved to GitHub. Your site updates in about two minutes.':draft?'Showing your local edits, which are not in the team file yet.'+(edit?'':TMTGitHub.repo?' Open Edit positions to save them.':' Open Edit positions to export them.'):teamState==='missing'?'No team positions are published yet, so these are default positions.':teamState==='invalid'?'The team positions file could not be read, so these are default positions.':'';
